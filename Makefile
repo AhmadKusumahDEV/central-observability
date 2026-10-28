@@ -1,4 +1,4 @@
-.PHONY: init config up down logs ps demo test test-rules backup backup-powershell
+.PHONY: init config up down logs ps demo example-go example-node example-python smoke test test-rules backup backup-powershell
 
 init:
 	sh scripts/init.sh
@@ -21,8 +21,19 @@ ps:
 demo:
 	docker compose -f examples/docker-compose.client.yml --profile go up -d --build
 
-test:
-	sh scripts/e2e-smoke.sh
+example-go:
+	docker compose -f examples/docker-compose.client.yml --profile go up -d --build
+
+example-node:
+	docker compose -f examples/docker-compose.client.yml --profile node up -d --build
+
+example-python:
+	docker compose -f examples/docker-compose.client.yml --profile python up -d --build
+
+smoke:
+	sh scripts/smoke-test.sh
+
+test: smoke
 
 test-rules:
 	docker run --rm --entrypoint /bin/promtool \
