@@ -13,6 +13,9 @@ Komponen yang dikelola di repo ini:
 - Tempo untuk traces
 - Alertmanager untuk routing notifikasi
 
+Dokumentasi lengkap, alamat service, aturan nama, dan troubleshooting ada di
+[docs/README.md](docs/README.md).
+
 ## Arsitektur
 
 ```mermaid
@@ -188,7 +191,7 @@ Nilai bcrypt di `.env` harus dibungkus single quote agar karakter `$` tidak
 diinterpolasi oleh Compose.
 
 Aplikasi remote menggunakan endpoint HTTPS dan header Basic auth. Detail
-variabel dan contohnya ada di [INTEGRATION.md](INTEGRATION.md). Basic auth
+variabel dan contohnya ada di [docs/INTEGRATION.md](docs/INTEGRATION.md). Basic auth
 melindungi akses jaringan, tetapi tidak memisahkan data antar penyewa: setiap
 aplikasi yang terautentikasi masih dapat mengirim label `service.name` palsu.
 Untuk zona kepercayaan yang berbeda, gunakan endpoint/gateway terpisah.
@@ -252,8 +255,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\backup.ps1
 ```
 
 Retensi, kapasitas, keamanan, backup, dan batasan diuraikan di
-[OPERATIONS.md](OPERATIONS.md). Kontrak onboarding aplikasi ada di
-[INTEGRATION.md](INTEGRATION.md).
+[docs/OPERATIONS.md](docs/OPERATIONS.md). Kontrak onboarding aplikasi ada di
+[docs/INTEGRATION.md](docs/INTEGRATION.md).
 
 ## Layout repository
 
