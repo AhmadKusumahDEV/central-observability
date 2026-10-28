@@ -34,6 +34,34 @@ services:
       timeout: 3s
       retries: 5
 
+  node-example:
+    profiles: ["node"]
+    build:
+      context: ./node
+    image: central-observability-example-node:0.1.0
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      PORT: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: example-node
+      DEPLOYMENT_ENVIRONMENT: dev
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=dev,service.namespace=examples,service.version=0.1.0
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      SERVICE_VERSION: 0.1.0
+    ports:
+      - "127.0.0.1:8082:8080"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz | grep -q ok"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 networks:
   monitoring:
     external: true

@@ -1,0 +1,24 @@
+{
+  "name": "central-observability-example-node",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js example that sends OTLP traces, metrics, and logs",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --require ./instrumentation.js app.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.300.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.300.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.300.0",
+    "@opentelemetry/instrumentation-http": "0.300.0",
+    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-logs": "3.0.0",
+    "@opentelemetry/sdk-metrics": "3.0.0",
+    "@opentelemetry/sdk-node": "0.300.0"
+  }
+}
+
