@@ -1,0 +1,10 @@
+.env
+secrets/*
+!secrets/README.md
+!secrets/*.example
+backups/
+.cache/
+*.log
+.DS_Store
+Thumbs.db
+
