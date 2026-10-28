@@ -133,29 +133,6 @@ services:
       retries: 10
       start_period: 20s
 
-  demo-app:
-    profiles: ["demo"]
-    build:
-      context: ./examples/go-demo-app
-    image: central-observability-demo:0.1.0
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
-      OTEL_SERVICE_NAME: go-demo
-      DEPLOYMENT_ENVIRONMENT: dev
-      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=dev,service.namespace=observability-demo,service.version=0.1.0
-      OTEL_METRICS_EXPORTER: otlp
-      OTEL_TRACES_EXPORTER: otlp
-      OTEL_LOGS_EXPORTER: otlp
-    ports:
-      - "127.0.0.1:8080:8080"
-    networks:
-      - monitoring
-    depends_on:
-      - otel-collector
-
   caddy:
     profiles: ["ingress"]
     image: caddy:2.11.7

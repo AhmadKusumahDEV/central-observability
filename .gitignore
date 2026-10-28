@@ -4,6 +4,7 @@ secrets/*
 !secrets/*.example
 backups/
 .cache/
+examples/go/central-observability-demo
 *.log
 .DS_Store
 Thumbs.db

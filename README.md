@@ -122,7 +122,7 @@ Endpoint dari host:
 | Collector health | http://127.0.0.1:13133/ |
 | OTLP gRPC untuk proses host | http://127.0.0.1:4317 |
 | OTLP HTTP untuk proses host | http://127.0.0.1:4318 |
-| Demo app, hanya profil `demo` | http://127.0.0.1:8080 |
+| Contoh Go, profil `go` | http://127.0.0.1:8081 |
 
 Container aplikasi yang bergabung ke network `monitoring` memakai:
 
@@ -134,20 +134,20 @@ http://otel-collector:4318
 ## Demo dan verifikasi end-to-end
 
 ```sh
-docker compose --profile demo up -d --build demo-app
+docker compose -f examples/docker-compose.client.yml --profile go up -d --build
 sh scripts/e2e-smoke.sh
 ```
 
 Windows:
 
 ```powershell
-docker compose --profile demo up -d --build demo-app
+docker compose -f examples/docker-compose.client.yml --profile go up -d --build
 powershell -ExecutionPolicy Bypass -File .\scripts\e2e-smoke.ps1
 ```
 
 Demo menghasilkan:
 
-- `go-demo` dengan environment `dev`
+- `example-go` dengan environment `dev`
 - histogram HTTP dengan explicit buckets
 - trace untuk setiap request
 - log OTLP untuk request normal dan error
@@ -157,7 +157,7 @@ Demo menghasilkan:
 Setelah uji otomatis lulus:
 
 1. Buka http://127.0.0.1:3000/d/central-service-overview.
-2. Pilih Service `go-demo` dan Environment `dev`.
+2. Pilih Service `example-go` dan Environment `dev`.
 3. Pastikan request rate, 5xx rate, dan p95/p99 memiliki data.
 4. Buka panel log error, lalu klik `TraceID`. Trace harus terbuka di Tempo.
 5. Buka panel slow traces dan pastikan request `/slow` tampil.
@@ -270,7 +270,7 @@ config/alertmanager/        routing dan receiver
 grafana/provisioning/       datasource dan dashboard provider
 grafana/dashboards/         JSON dashboard
 ingress/                    TLS dan auth untuk remote OTLP
-examples/go-demo-app/       aplikasi uji end-to-end
+examples/go/                aplikasi contoh Go
 scripts/                    init, backup, smoke test
 ```
 

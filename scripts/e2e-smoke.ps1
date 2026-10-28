@@ -7,7 +7,7 @@ $prometheus = "http://127.0.0.1:9090"
 $grafana = "http://127.0.0.1:3000"
 $loki = "http://127.0.0.1:3100"
 $tempo = "http://127.0.0.1:3200"
-$demo = "http://127.0.0.1:8080"
+$demo = "http://127.0.0.1:8081"
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -30,8 +30,9 @@ function Wait-Http {
     throw "FAIL: $Name did not become ready"
 }
 
-Write-Host "Starting the demo profile..."
-docker compose --profile demo up -d --build
+Write-Host "Starting the stack and Go example..."
+docker compose up -d --remove-orphans
+docker compose -f examples/docker-compose.client.yml --profile go up -d --build
 
 Write-Host "Waiting for services..."
 Wait-Http Grafana "$grafana/api/health"
@@ -54,17 +55,17 @@ for ($i = 1; $i -le 15; $i++) {
 Write-Host "Waiting for OTLP batching and backend ingestion..."
 Start-Sleep -Seconds 30
 
-$promQuery = [Uri]::EscapeDataString('http_server_request_duration_seconds_count{service_name="go-demo", deployment_environment_name="dev"}')
+$promQuery = [Uri]::EscapeDataString('http_server_request_duration_seconds_count{service_name="example-go", deployment_environment_name="dev"}')
 $promJson = Invoke-RestMethod -Uri "$prometheus/api/v1/query?query=$promQuery"
 $promRaw = $promJson | ConvertTo-Json -Depth 20 -Compress
-Assert-True ($promRaw -match '"service_name":"go-demo"') "metrics reached Prometheus"
+Assert-True ($promRaw -match '"service_name":"example-go"') "metrics reached Prometheus"
 
-$lokiQuery = [Uri]::EscapeDataString('{service_name="go-demo", deployment_environment_name="dev"}')
+$lokiQuery = [Uri]::EscapeDataString('{service_name="example-go", deployment_environment_name="dev"}')
 $lokiJson = Invoke-RestMethod -Uri "$loki/loki/api/v1/query_range?query=$lokiQuery&limit=10"
 $lokiRaw = $lokiJson | ConvertTo-Json -Depth 20 -Compress
 Assert-True ($lokiRaw -match '"values":\[\[') "logs reached Loki"
 
-$tempoQuery = [Uri]::EscapeDataString('{ resource.service.name="go-demo" }')
+$tempoQuery = [Uri]::EscapeDataString('{ resource.service.name="example-go" }')
 $tempoJson = Invoke-RestMethod -Uri "$tempo/api/search?q=$tempoQuery&limit=10"
 $tempoRaw = $tempoJson | ConvertTo-Json -Depth 20 -Compress
 Assert-True ($tempoRaw -match '"traceID"') "traces reached Tempo"
@@ -83,6 +84,6 @@ Assert-True ($dashboardRaw -match 'central-service-overview') "Grafana dashboard
 
 Write-Host ""
 Write-Host "All automated smoke checks passed."
-Write-Host "Open $grafana/d/central-service-overview and set Service=go-demo, Environment=dev."
+Write-Host "Open $grafana/d/central-service-overview and set Service=example-go, Environment=dev."
 Write-Host "Click TraceID in the recent error logs panel to verify log-to-trace correlation."
 

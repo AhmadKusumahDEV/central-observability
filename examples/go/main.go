@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/XSAM/otelsql"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -25,15 +29,19 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	_ "modernc.org/sqlite"
 )
 
 const instrumentationName = "example.com/central-observability-demo"
 
 type application struct {
-	tracer    trace.Tracer
-	logger    otellog.Logger
-	duration  metric.Float64Histogram
-	heartbeat metric.Float64Gauge
+	tracer        trace.Tracer
+	logger        otellog.Logger
+	duration      metric.Float64Histogram
+	heartbeat     metric.Float64Gauge
+	db            *sql.DB
+	http          *http.Client
+	downstreamURL string
 }
 
 func main() {
@@ -58,8 +66,14 @@ func main() {
 
 	addr := env("APP_ADDR", ":8080")
 	server := &http.Server{
-		Addr:              addr,
-		Handler:           mux,
+		Addr: addr,
+		Handler: otelhttp.NewHandler(
+			mux,
+			"http.server",
+			otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+				return r.Method + " " + switchRoute(r.URL.Path)
+			}),
+		),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -154,16 +168,40 @@ func setup(ctx context.Context) (*application, func(), error) {
 		return nil, nil, fmt.Errorf("create heartbeat gauge: %w", err)
 	}
 
+	database, err := otelsql.Open("sqlite", "file:demo?mode=memory&cache=shared")
+	if err != nil {
+		return nil, nil, fmt.Errorf("open sqlite database: %w", err)
+	}
+	database.SetMaxOpenConns(1)
+	if _, err := database.ExecContext(ctx,
+		"CREATE TABLE IF NOT EXISTS work_items ("+
+			"id INTEGER PRIMARY KEY AUTOINCREMENT,"+
+			"created_at TEXT NOT NULL"+
+			")",
+	); err != nil {
+		_ = database.Close()
+		return nil, nil, fmt.Errorf("create demo table: %w", err)
+	}
+
+	httpClient := &http.Client{
+		Timeout:   3 * time.Second,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
+
 	app := &application{
-		tracer:    tracerProvider.Tracer(instrumentationName),
-		logger:    loggerProvider.Logger(instrumentationName),
-		duration:  duration,
-		heartbeat: heartbeat,
+		tracer:        tracerProvider.Tracer(instrumentationName),
+		logger:        loggerProvider.Logger(instrumentationName),
+		duration:      duration,
+		heartbeat:     heartbeat,
+		db:            database,
+		http:          httpClient,
+		downstreamURL: "http://127.0.0.1:8080/downstream",
 	}
 
 	cleanup := func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		_ = database.Close()
 		_ = loggerProvider.Shutdown(shutdownCtx)
 		_ = meterProvider.Shutdown(shutdownCtx)
 		_ = tracerProvider.Shutdown(shutdownCtx)
@@ -176,8 +214,8 @@ func (a *application) handleWork(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	ctx, span := a.tracer.Start(
 		r.Context(),
-		"HTTP "+r.Method+" "+route,
-		trace.WithSpanKind(trace.SpanKindServer),
+		"process "+route,
+		trace.WithSpanKind(trace.SpanKindInternal),
 		trace.WithAttributes(
 			attribute.String("http.request.method", r.Method),
 			attribute.String("http.route", route),
@@ -202,8 +240,24 @@ func (a *application) handleWork(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		time.Sleep(delay)
+	case "/work":
+		if err := a.callDownstream(ctx); err != nil {
+			statusCode = http.StatusInternalServerError
+			requestErr = fmt.Errorf("call downstream: %w", err)
+			span.RecordError(requestErr)
+			span.SetStatus(codes.Error, requestErr.Error())
+			break
+		}
+		if err := a.recordWork(ctx); err != nil {
+			statusCode = http.StatusInternalServerError
+			requestErr = fmt.Errorf("write database: %w", err)
+			span.RecordError(requestErr)
+			span.SetStatus(codes.Error, requestErr.Error())
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
 	default:
-		time.Sleep(35 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	duration := time.Since(started)
@@ -219,6 +273,9 @@ func (a *application) handleWork(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if requestErr != nil {
+		serverSpan := trace.SpanFromContext(r.Context())
+		serverSpan.RecordError(requestErr)
+		serverSpan.SetStatus(codes.Error, requestErr.Error())
 		a.emitLog(ctx, otellog.SeverityError, "ERROR", requestErr.Error(), route, statusCode)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
@@ -229,6 +286,32 @@ func (a *application) handleWork(w http.ResponseWriter, r *http.Request) {
 	a.emitLog(ctx, otellog.SeverityInfo, "INFO", "request completed", route, statusCode)
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = fmt.Fprintf(w, "{\"status\":\"ok\",\"duration_ms\":%d,\"trace_id\":%q}\n", duration.Milliseconds(), span.SpanContext().TraceID().String())
+}
+
+func (a *application) callDownstream(ctx context.Context) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, a.downstreamURL, nil)
+	if err != nil {
+		return err
+	}
+	response, err := a.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1024))
+	if response.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("downstream returned %d", response.StatusCode)
+	}
+	return nil
+}
+
+func (a *application) recordWork(ctx context.Context) error {
+	_, err := a.db.ExecContext(
+		ctx,
+		"INSERT INTO work_items (created_at) VALUES (?)",
+		time.Now().UTC().Format(time.RFC3339Nano),
+	)
+	return err
 }
 
 func (a *application) emitLog(ctx context.Context, severity otellog.Severity, severityText, message, route string, statusCode int) {
@@ -272,7 +355,7 @@ func (a *application) emitHeartbeat(ctx context.Context) {
 
 func switchRoute(path string) string {
 	switch path {
-	case "/error", "/slow", "/work":
+	case "/error", "/slow", "/work", "/downstream":
 		return path
 	default:
 		return "/other"

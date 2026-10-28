@@ -19,7 +19,7 @@ ps:
 	docker compose ps
 
 demo:
-	docker compose --profile demo up -d --build demo-app
+	docker compose -f examples/docker-compose.client.yml --profile go up -d --build
 
 test:
 	sh scripts/e2e-smoke.sh
