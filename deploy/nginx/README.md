@@ -31,7 +31,8 @@ rate limit, dan kebijakan Access lebih jelas.
 
 ## Pemasangan di VPS
 
-Jalankan dari direktori `~/nginx` setelah file ini disalin:
+Jalankan dari direktori `~/nginx` setelah file ini disalin. Pada VPS ini user
+tidak berada di grup `docker`, jadi perintah Docker memakai `sudo`.
 
 ```sh
 cp docker-compose.yml docker-compose.yml.bak.$(date +%Y%m%d-%H%M%S)
@@ -65,11 +66,11 @@ networks:
 Buat network dan validasi konfigurasi:
 
 ```sh
-docker network create observability-ingress 2>/dev/null || true
+sudo docker network create observability-ingress 2>/dev/null || true
 docker compose config --quiet
-docker compose up -d --no-deps nginx
-docker exec nginx-proxy nginx -t
-docker exec nginx-proxy nginx -s reload
+sudo docker compose up -d --no-deps nginx
+sudo docker exec nginx-proxy nginx -t
+sudo docker exec nginx-proxy nginx -s reload
 ```
 
 `nginx -t` harus berhasil sebelum reload. Jangan memakai `docker compose down`

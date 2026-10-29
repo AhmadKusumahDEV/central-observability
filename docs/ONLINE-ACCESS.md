@@ -58,6 +58,10 @@ Target direktori:
 /home/ahmadkusumahdev/central-observability
 ```
 
+Pada VPS ini user `ahmadkusumahdev` tidak berada di grup `docker`; perintah
+Docker di bawah dijalankan dengan `sudo`. Jangan menambahkan user ke grup
+`docker` tanpa audit karena akses grup itu setara akses root.
+
 Langkah awal:
 
 ```sh
@@ -69,18 +73,24 @@ cp deploy/.env.production.example .env
 Setelah `init.sh`, isi `.env` dengan nilai produksi dan isi secret yang
 diperlukan. File `.env` dan `secrets/` sudah diabaikan Git.
 
+File secret yang dibaca container non-root harus dapat dibaca user container.
+Pada deployment ini file memakai `0644` karena host hanya dipakai satu user;
+jika memakai group khusus, gunakan `0640` dengan GID container yang sesuai.
+Tanpa permission baca, Grafana akan menolak login admin dan Alertmanager tidak
+dapat membaca token Telegram.
+
 Buat network yang dipakai stack:
 
 ```sh
-docker network create monitoring 2>/dev/null || true
-docker network create observability-ingress 2>/dev/null || true
+sudo docker network create monitoring 2>/dev/null || true
+sudo docker network create observability-ingress 2>/dev/null || true
 ```
 
 Jalankan stack dengan overlay produksi:
 
 ```sh
-docker compose -f compose.yaml -f deploy/compose.prod.yml up -d
-docker compose -f compose.yaml -f deploy/compose.prod.yml ps
+sudo docker compose -f compose.yaml -f deploy/compose.prod.yml up -d
+sudo docker compose -f compose.yaml -f deploy/compose.prod.yml ps
 ```
 
 Periksa kesehatan dasar:

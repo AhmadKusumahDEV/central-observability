@@ -30,7 +30,11 @@ if [ ! -f secrets/telegram_chat_id ]; then
     printf '%s' '0' > secrets/telegram_chat_id
     echo "created secrets/telegram_chat_id placeholder"
 fi
-chmod 600 secrets/grafana_admin_password secrets/telegram_bot_token secrets/telegram_chat_id
+# Grafana dan Alertmanager berjalan sebagai user non-root di container. File
+# secret harus dapat dibaca oleh user tersebut melalui /run/secrets. Host ini
+# dipakai satu operator; jika ada user lokal lain, gunakan group khusus dengan
+# mode 0640 dan GID container yang sesuai.
+chmod 644 secrets/grafana_admin_password secrets/telegram_bot_token secrets/telegram_chat_id
 
 if [ ! -f .env ]; then
     cp .env.example .env
