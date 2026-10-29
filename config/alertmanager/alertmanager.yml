@@ -1,0 +1,42 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: telegram
+  group_by: [alertname, service, environment]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - alertname="Watchdog"
+      receiver: blackhole
+      repeat_interval: 24h
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="ServiceNoHeartbeat"
+    target_matchers:
+      - alertname=~"ServiceHighErrorRate|ServiceHighLatency"
+    equal: [job, deployment_environment_name]
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /run/secrets/telegram_bot_token
+        chat_id_file: /run/secrets/telegram_chat_id
+        send_resolved: true
+        parse_mode: HTML
+        message: |-
+          {{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}: <b>{{ .CommonLabels.alertname }}</b>
+          {{ range .Alerts }}
+          <b>Service:</b> {{ if .Labels.service }}{{ .Labels.service }}{{ else }}{{ .Labels.job }}{{ end }}
+          <b>Environment:</b> {{ if .Labels.environment }}{{ .Labels.environment }}{{ else if .Labels.deployment_environment_name }}{{ .Labels.deployment_environment_name }}{{ else }}unknown{{ end }}
+          <b>Summary:</b> {{ .Annotations.summary }}
+          {{ with .Annotations.description }}<b>Details:</b> {{ . }}{{ end }}
+          {{ end }}
+
+  # Used for the always-firing Watchdog health signal. Add Slack or email
+  # receivers here if you prefer those transports; keep credentials in files.
+  - name: blackhole
+

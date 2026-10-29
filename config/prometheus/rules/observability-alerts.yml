@@ -1,0 +1,90 @@
+groups:
+  - name: observability-alerts
+    interval: 30s
+    rules:
+      - record: app:http_requests:rate5m
+        expr: |
+          sum by (service_name, job, deployment_environment_name) (
+            rate(http_server_request_duration_seconds_count[5m])
+          )
+
+      - record: app:http_server_error_ratio:rate5m
+        expr: |
+          100 *
+          sum by (service_name, job, deployment_environment_name) (
+            rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])
+          )
+          /
+          clamp_min(
+            sum by (service_name, job, deployment_environment_name) (
+              rate(http_server_request_duration_seconds_count[5m])
+            ),
+            1e-9
+          )
+
+      - record: app:http_request_duration:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service_name, job, deployment_environment_name) (
+              rate(http_server_request_duration_seconds_bucket[5m])
+            )
+          )
+
+      - alert: ServiceHighErrorRate
+        expr: app:http_server_error_ratio:rate5m > 5
+        for: 10m
+        labels:
+          severity: critical
+          service: "{{ $labels.service_name }}"
+          environment: "{{ $labels.deployment_environment_name }}"
+        annotations:
+          summary: "Error rate above 5% for {{ $labels.service_name }}"
+          description: "5xx ratio is {{ $value | printf \"%.2f\" }}% in {{ $labels.deployment_environment_name }}."
+
+      - alert: ServiceHighLatency
+        expr: app:http_request_duration:p95_5m > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.service_name }}"
+          environment: "{{ $labels.deployment_environment_name }}"
+        annotations:
+          summary: "p95 latency above 500 ms for {{ $labels.service_name }}"
+          description: "p95 HTTP duration is {{ $value | printf \"%.3f\" }} seconds in {{ $labels.deployment_environment_name }}."
+
+      - alert: ServiceNoHeartbeat
+        expr: |
+          max by (job, deployment_environment_name) (
+            last_over_time(target_info{job!="otel-collector"}[24h])
+          )
+          unless on (job, deployment_environment_name)
+          max by (job, deployment_environment_name) (
+            last_over_time(app_heartbeat_timestamp_seconds[2m])
+          )
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+          environment: "{{ $labels.deployment_environment_name }}"
+        annotations:
+          summary: "No application heartbeat from {{ $labels.job }}"
+          description: "No app_heartbeat_timestamp_seconds sample arrived for more than two minutes in {{ $labels.deployment_environment_name }}."
+
+      - alert: TelemetryCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenTelemetry Collector is not scrapeable"
+          description: "Prometheus has failed to scrape the central OpenTelemetry Collector for two minutes."
+
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Alerting pipeline is running"
+          description: "This alert is routed to the blackhole receiver and confirms Prometheus can evaluate and send alerts to Alertmanager."
+

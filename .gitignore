@@ -1,0 +1,16 @@
+.env
+secrets/*
+!secrets/README.md
+!secrets/*.example
+backups/
+.cache/
+.tmp/
+examples/go/central-observability-demo
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+Thumbs.db
+

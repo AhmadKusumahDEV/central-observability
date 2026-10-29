@@ -1,0 +1,28 @@
+name: example-go-service
+
+services:
+  app:
+    build: .
+    image: central-observability-example-go-service:0.1.0
+    restart: unless-stopped
+    env_file:
+      - otel.env
+    ports:
+      - "127.0.0.1:8084:8080"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz | grep -q ok"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  monitoring:
+    external: true
+    name: monitoring

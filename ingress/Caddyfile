@@ -1,0 +1,30 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$OTEL_DOMAIN} {
+	encode zstd gzip
+
+	log {
+		output stdout
+		format console
+	}
+
+	@grpc protocol grpc
+	handle @grpc {
+		basic_auth {
+			{$OTLP_BASIC_USER} {$OTLP_BASIC_HASH}
+		}
+		reverse_proxy h2c://otel-collector:4317
+	}
+
+	handle /v1/* {
+		basic_auth {
+			{$OTLP_BASIC_USER} {$OTLP_BASIC_HASH}
+		}
+		reverse_proxy otel-collector:4318
+	}
+
+	respond "Not found" 404
+}
+

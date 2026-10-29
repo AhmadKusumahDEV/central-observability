@@ -1,0 +1,68 @@
+rule_files:
+  - ../rules/observability-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{service_name="demo",job="demo",deployment_environment_name="prod",http_response_status_code="200"}'
+        values: '0+60x20'
+      - series: 'http_server_request_duration_seconds_count{service_name="demo",job="demo",deployment_environment_name="prod",http_response_status_code="500"}'
+        values: '0+5x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ServiceHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: demo
+              environment: prod
+              job: demo
+              deployment_environment_name: prod
+              service_name: demo
+            exp_annotations:
+              summary: Error rate above 5% for demo
+              description: 5xx ratio is 7.69% in prod.
+
+  - interval: 1m
+    input_series:
+      - series: 'target_info{job="demo",deployment_environment_name="prod"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ServiceNoHeartbeat
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: demo
+              environment: prod
+              job: demo
+              deployment_environment_name: prod
+            exp_annotations:
+              summary: No application heartbeat from demo
+              description: No app_heartbeat_timestamp_seconds sample arrived for more than two minutes in prod.
+
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_bucket{service_name="demo",job="demo",deployment_environment_name="prod",le="0.5"}'
+        values: '0+10x20'
+      - series: 'http_server_request_duration_seconds_bucket{service_name="demo",job="demo",deployment_environment_name="prod",le="1"}'
+        values: '0+100x20'
+      - series: 'http_server_request_duration_seconds_bucket{service_name="demo",job="demo",deployment_environment_name="prod",le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ServiceHighLatency
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              service: demo
+              environment: prod
+              job: demo
+              deployment_environment_name: prod
+              service_name: demo
+            exp_annotations:
+              summary: p95 latency above 500 ms for demo
+              description: p95 HTTP duration is 0.972 seconds in prod.
+
