@@ -35,6 +35,29 @@ hanya membuat satu file bootstrap OpenTelemetry dan instrumentasi framework
 Rust yang dipakai. Jika nanti ada beberapa project Rust, file bootstrap itu
 bisa dijadikan crate internal bersama.
 
+## File Markdown di repo aplikasi
+
+Setiap repo aplikasi sebaiknya punya satu `AGENTS.md` di root. Isinya adalah
+kontrak khusus aplikasi itu, bukan salinan `AGENTS.md` pusat. Isi minimumnya:
+
+- nama service dan environment;
+- bahasa dan folder package/template yang dipakai;
+- endpoint same-host atau remote;
+- perintah build dan pengecekan;
+- larangan menambahkan service monitoring;
+- tautan ke dokumen pusat ini.
+
+Contoh konkret ada di
+[templates/go-service/AGENTS.md](../templates/go-service/AGENTS.md). Saat
+menyalin template ke project baru, ganti nama service dan environment di file
+itu.
+
+Jangan menyalin `AGENTS.md` pusat ke repo aplikasi. File pusat itu mengatur
+perubahan pada stack observability; file aplikasi mengatur aplikasi yang
+mengirim telemetry. Jika agent aplikasi tidak bisa membuka repo pusat, salin
+dokumen ini ke `docs/observability/AGENT-INTEGRATION.md` di repo aplikasi dan
+perbarui salinannya saat kontrak pusat berubah.
+
 Jika agent hanya menerima satu file, berikan file ini. Jika agent juga dapat
 membaca repo pusat, berikan folder
 `templates/go-service/pkg/observability`. Folder itu adalah kode yang harus
