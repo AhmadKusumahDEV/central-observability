@@ -2,7 +2,7 @@
 
 ## Identitas telemetry
 
-- Language: Go
+- Language: Go 1.26+
 - `service.name`: `example-go-service`
 - `deployment.environment.name`: `dev`
 - Package: `pkg/observability` (disalin dari template pusat)
@@ -11,6 +11,10 @@
 
 Ganti nama service dan environment saat template ini dipakai untuk project
 nyata. Ikuti aturan di `docs/NAMING.md` pada repo pusat.
+
+Salin `otel.env.example` menjadi `otel.env` untuk menjalankan aplikasi. File
+`otel.env` sudah diabaikan Git dan tidak boleh berisi credential yang akan
+di-commit.
 
 ## Aturan integrasi
 

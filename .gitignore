@@ -1,4 +1,9 @@
 .env
+.env.*
+!.env.example
+otel.env
+otel.*.env
+!otel.env.example
 secrets/*
 !secrets/README.md
 !secrets/*.example
