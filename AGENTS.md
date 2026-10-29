@@ -16,8 +16,10 @@ Grafana, Prometheus, Loki, Tempo, Collector, atau Alertmanager sendiri.
 - Jangan menambahkan service monitoring ke Compose aplikasi client.
 - Edge publik adalah Cloudflare Tunnel yang sudah ada menuju Nginx internal.
   Jangan mengaktifkan profil Caddy bersamaan dengan Nginx.
-- Jangan membuka port 80/443/3000/9090/9093/3100/3200/4317/4318 ke host atau
-  internet. Backend hanya boleh dijangkau lewat network Docker internal.
+- Jangan bind port backend ke `0.0.0.0` atau internet. Backend hanya boleh
+  dijangkau lewat network Docker internal. Pengecualian: Collector boleh bind
+  ke `127.0.0.1:4317/4318` agar aplikasi native di VPS yang sama dapat mengirim
+  telemetry; jangan membukanya ke alamat publik.
 - Endpoint remote memakai OTLP/HTTP di Cloudflare Tunnel dan Basic auth per
   aplikasi. OTLP gRPC tetap untuk aplikasi same-host; Cloudflare Access tidak
   melindungi gRPC.

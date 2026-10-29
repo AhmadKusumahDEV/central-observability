@@ -4,6 +4,19 @@ Dokumen ini adalah satu file yang dapat diberikan kepada coding agent di repo
 aplikasi. Agent harus membaca dokumen ini dari atas ke bawah, lalu menyalin
 package dari folder `templates/go-service/pkg/observability` di repo pusat.
 
+Untuk handoff yang lebih singkat, gunakan
+[templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md). Dokumen ini
+adalah referensi lengkap; prompt tersebut adalah runbook yang diisi dengan
+identitas satu service.
+
+## Quick path untuk service Go yang sudah berjalan
+
+1. Pastikan `pkg/observability` sudah disalin ke project; jangan salin ulang.
+2. Isi [templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md).
+3. Berikan prompt itu ke agent aplikasi.
+4. Agent membuat env, wiring, dan menjalankan verifikasi.
+5. Jangan mengubah repo observability pusat kecuali menambah alert khusus.
+
 Kontrak pusatnya adalah **OTLP**, bukan Go. Package Go di folder template adalah
 alat bantu untuk aplikasi Go. Aplikasi Rust, Node.js, Python, Java, .NET, atau
 bahasa lain memakai SDK OpenTelemetry resmi untuk bahasanya dan mengirim ke
@@ -63,10 +76,12 @@ mengirim telemetry. Jika agent aplikasi tidak bisa membuka repo pusat, salin
 dokumen ini ke `docs/observability/AGENT-INTEGRATION.md` di repo aplikasi dan
 perbarui salinannya saat kontrak pusat berubah.
 
-Jika agent hanya menerima satu file, berikan file ini. Jika agent juga dapat
-membaca repo pusat, berikan folder
-`templates/go-service/pkg/observability`. Folder itu adalah kode yang harus
-disalin; folder `stack/` dari package lama tidak boleh disalin.
+Untuk handoff ke agent aplikasi, berikan
+[templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) setelah
+`pkg/observability` disalin. Dokumen ini adalah referensi lengkap jika prompt
+belum diisi. Jangan meminta agent menulis ulang package; folder
+`templates/go-service/pkg/observability` adalah kode yang harus disalin, dan
+folder `stack/` dari package lama tidak boleh disalin.
 
 Dokumen pendukung:
 
@@ -207,9 +222,15 @@ go get go.opentelemetry.io/otel/trace@v1.47.0
 go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc@v1.47.0
 go get go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc@v1.47.0
 go get go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc@v0.23.0
+go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.47.0
+go get go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp@v1.47.0
+go get go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp@v0.23.0
 go get go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp@v0.72.0
 go mod tidy
 ```
+
+Package memakai Go `1.26` atau lebih baru. Service yang masih memakai Go 1.21
+atau 1.22 harus upgrade toolchain sebelum menyalin package ini.
 
 Jika aplikasi memakai database SQL, tambahkan juga:
 
@@ -220,9 +241,24 @@ go get github.com/XSAM/otelsql@v0.44.0
 Versi di atas adalah versi yang dipakai template. Jangan mencampur OTel core
 `v1.46.0` dengan exporter `v1.43.0`; pilih satu set dan jalankan `go mod tidy`.
 
-## 6. Buat file `otel.env`
+## 6. Buat file `otel.env.example` dan `otel.env`
 
-Buat file `otel.env` di root project:
+Buat `otel.env.example` yang boleh di-commit, lalu salin menjadi `otel.env`
+untuk nilai lokal/produksi. Jangan commit `otel.env` jika berisi credential.
+Tambahkan pola ini ke `.gitignore` aplikasi:
+
+```gitignore
+.env
+.env.*
+!.env.example
+otel.env
+otel.*.env
+!otel.env.example
+secrets/
+*.htpasswd
+```
+
+Contoh isi `otel.env.example`:
 
 ```dotenv
 # Alamat Collector dari dalam container aplikasi.
@@ -271,6 +307,16 @@ Penjelasan setiap baris:
 | `OBSERVABILITY_HEARTBEAT_INTERVAL` | Interval heartbeat service. |
 | `APP_ADDR` | Alamat HTTP aplikasi di dalam container. |
 
+Untuk aplikasi native di VPS yang sama, gunakan `http://127.0.0.1:4317`.
+Jangan memakai `localhost` karena dapat resolve ke IPv6, sementara Collector
+dipublikasikan ke IPv4 loopback. Untuk Docker, gunakan nama service
+`otel-collector` dan join network `monitoring`.
+
+Package ini selalu memakai OTLP. Variabel `OTEL_TRACES_EXPORTER`,
+`OTEL_METRICS_EXPORTER`, dan `OTEL_LOGS_EXPORTER` tidak dibaca oleh package;
+variabel itu relevan untuk SDK lain. Saklar mati package adalah
+`OBSERVABILITY_ENABLED=false`; `OTEL_SDK_DISABLED=true` juga didukung.
+
 Untuk server remote, jangan membuka port 4317 atau 4318 ke internet. VPS pusat
 memakai Cloudflare Tunnel dan Nginx; endpoint publiknya adalah OTLP/HTTP di
 `https://otlp.madgo.my.id`. Contoh env remote:
@@ -312,6 +358,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -336,7 +383,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              ":8080",
-		Handler:           stack.HandlerWithRoute(mux, routeForRequest),
+		Handler:           stack.HandlerWithRoute(mux, routeForRequest(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -349,18 +396,22 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_ = server.Shutdown(shutdownCtx)
-	_ = stack.Shutdown(shutdownCtx)
+	serverCtx, cancelServer := context.WithTimeout(context.Background(), 10*time.Second)
+	_ = server.Shutdown(serverCtx)
+	cancelServer()
+
+	telemetryCtx, cancelTelemetry := context.WithTimeout(context.Background(), 10*time.Second)
+	_ = stack.Shutdown(telemetryCtx)
+	cancelTelemetry()
 }
 
-func routeForRequest(r *http.Request) string {
-	switch r.URL.Path {
-	case "/healthz", "/work":
-		return r.URL.Path
-	default:
-		return "unmatched"
+func routeForRequest(mux *http.ServeMux) func(*http.Request) string {
+	return func(r *http.Request) string {
+		_, pattern := mux.Handler(r)
+		if _, path, ok := strings.Cut(pattern, " "); ok {
+			return path
+		}
+		return pattern
 	}
 }
 ```
@@ -383,7 +434,7 @@ route template perlu diambil dari framework, bukan dari `http.Request.Pattern`.
 | `stack.HTTPClient` | HTTP client dengan span keluar dan propagasi trace. |
 | `stack.RecordHTTPDuration` | Mencatat histogram HTTP secara manual. |
 | `stack.LogRequest` | Menulis access log dengan konteks trace. |
-| `stack.Shutdown` | Mengirim sisa logs, metrics, dan traces. |
+| `stack.Shutdown` | Mengirim sisa traces, metrics, dan logs. |
 
 ## 8. Hubungkan database dan HTTP client
 
@@ -870,6 +921,8 @@ curl -X POST http://127.0.0.1:9090/-/reload
 
 - [ ] Folder `pkg/observability` disalin dari template pusat, bukan dari
       `go-chat/pkg/observability/stack`.
+- [ ] Go `1.26` atau lebih baru; dependency memakai satu set OTel `v1.47.0`
+      beserta exporter HTTP `v0.23.0` untuk logs.
 - [ ] `OTEL_SERVICE_NAME` mengikuti [NAMING.md](NAMING.md).
 - [ ] `deployment.environment.name` berisi `dev`, `staging`, atau `prod`.
 - [ ] Aplikasi same-host memakai `otel-collector:4317`/`4318`; aplikasi remote
@@ -878,10 +931,12 @@ curl -X POST http://127.0.0.1:9090/-/reload
 - [ ] Tidak ada `OBSERVABILITY_LOKI_URL` yang mengarah ke Loki pusat.
 - [ ] `observability.Setup` dipanggil sebelum HTTP server.
 - [ ] `stack.Shutdown` dipanggil setelah HTTP server berhenti.
-- [ ] HTTP server memakai `stack.Handler` atau `otelgin`/`echo-otel`.
+- [ ] HTTP server memakai `stack.HandlerWithRoute` untuk ServeMux, atau
+      `otelgin`/`echo-otel` untuk Gin/Echo.
 - [ ] HTTP client memakai `stack.HTTPClient` atau `otelhttp.NewTransport`.
 - [ ] Database memakai `otelsql` atau instrumentasi resmi yang setara.
 - [ ] Nama route memakai template, bukan URL mentah.
+- [ ] `otel.env` diabaikan Git dan hanya `otel.env.example` yang di-commit.
 - [ ] `http.server.request.duration` muncul di Prometheus.
 - [ ] Log muncul di Loki dan memiliki `trace_id`.
 - [ ] Trace muncul di Tempo dan dapat dibuka dari log.
@@ -898,7 +953,7 @@ curl -X POST http://127.0.0.1:9090/-/reload
 2. Salin folder `pkg/observability` dari template pusat. Jika folder itu sudah
    ada di project, lewati langkah ini.
 3. Tambahkan dependency dengan versi pin dan jalankan `go mod tidy`.
-4. Buat `otel.env` dari contoh di bagian 6.
+4. Buat `otel.env.example`, lalu salin menjadi `otel.env` sesuai bagian 6.
 5. Ubah `main.go` mengikuti bagian 7.
 6. Sambungkan database dan HTTP client mengikuti bagian 8.
 7. Tambahkan external network `monitoring` mengikuti bagian 11.

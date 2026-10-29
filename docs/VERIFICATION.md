@@ -13,9 +13,11 @@ cd templates/go-service
 gofmt -w ./cmd ./pkg
 go build ./...
 go vet ./...
+go test ./...
 ```
 
-Hasil: `go build` dan `go vet` selesai tanpa error.
+Hasil: `go build`, `go vet`, dan unit test package observability selesai tanpa
+error. Test mencakup normalisasi route method dan sampling rasio `0`.
 
 ## Uji lewat Docker Compose client
 

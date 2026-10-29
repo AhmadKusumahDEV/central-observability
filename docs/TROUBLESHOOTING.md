@@ -44,7 +44,9 @@ count by (__name__) ({__name__=~"http_server_request_duration.*", service_name="
 
 Jika kosong:
 
-1. Pastikan `OTEL_METRICS_EXPORTER=otlp`.
+1. Untuk package Go ini, pastikan `OBSERVABILITY_ENABLED` bukan `false`.
+   Variabel `OTEL_METRICS_EXPORTER` hanya berlaku untuk SDK lain; package
+   selalu memakai OTLP.
 2. Pastikan histogram direkam dengan nama
    `http.server.request.duration` dan unit `s`.
 3. Tunggu satu interval export SDK, biasanya 10 detik.
@@ -87,6 +89,9 @@ Pastikan exporter logs aktif:
 ```dotenv
 OTEL_LOGS_EXPORTER=otlp
 ```
+
+Untuk package Go di repo ini, variabel tersebut tidak dibaca; package selalu
+mengirim logs lewat OTLP. Variabel ini relevan untuk SDK bahasa lain.
 
 Log yang hanya dicetak ke stdout container tidak otomatis dibaca Collector
 pusat. Gunakan OTel Logs SDK atau log bridge yang mengirim OTLP.
