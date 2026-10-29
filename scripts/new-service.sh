@@ -110,19 +110,19 @@ networks:
 EOF
 
 cat > "$OUTPUT/README.md" <<EOF
-# $NAME Monitoring Integration
+# Integrasi Monitoring $NAME
 
-This directory contains only the application settings needed by the central
-observability stack. It does not include Prometheus, Loki, Tempo, Grafana,
-Collector, or Alertmanager.
+Direktori ini hanya berisi konfigurasi aplikasi untuk stack observability
+pusat. Direktori ini tidak berisi Prometheus, Loki, Tempo, Grafana, Collector,
+atau Alertmanager.
 
-Start the application:
+Jalankan aplikasi:
 
     docker compose up -d
 
-The container must reach otel-collector:4317 on the external monitoring
-network. Follow docs/INTEGRATION.md in the observability repository for verification,
-database instrumentation, and alert ownership.
+Container harus dapat menjangkau otel-collector:4317 melalui external network
+monitoring. Ikuti docs/INTEGRATION.md di repository observability untuk
+verifikasi, instrumentasi database, dan kepemilikan alert.
 
 Service: $NAME
 
