@@ -145,6 +145,7 @@ Generator membuat `otel.env`, `docker-compose.yml`, dan
 - [Panduan agent untuk project baru](docs/AGENT-INTEGRATION.md)
 - [Integrasi langkah demi langkah](docs/INTEGRATION.md)
 - [Akses online, Nginx, dan Cloudflare](docs/ONLINE-ACCESS.md)
+- [Security policy untuk repo publik](SECURITY.md)
 - [Aturan nama dan label](docs/NAMING.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Operasi, retensi, backup, dan alert](docs/OPERATIONS.md)
