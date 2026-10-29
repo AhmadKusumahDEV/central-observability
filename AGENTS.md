@@ -55,14 +55,18 @@ Grafana, Prometheus, Loki, Tempo, Collector, atau Alertmanager sendiri.
 | `grafana/dashboards/` | Dashboard JSON sebagai kode |
 | `ingress/` | TLS dan autentikasi untuk endpoint remote |
 | `examples/` | Aplikasi contoh dan Compose client |
+| `templates/go-service/` | Template Go yang bisa disalin ke project baru |
+| `docs/AGENT-INTEGRATION.md` | Instruksi integrasi untuk agent di repo aplikasi |
 | `scripts/` | Inisialisasi, smoke test, generator, dan backup |
 
 ## Playbook perubahan
 
 ### Aplikasi baru
 
-Ikuti [docs/INTEGRATION.md](docs/INTEGRATION.md). Aplikasi hanya bergabung ke
-network `monitoring` dan mengirim OTLP melalui environment variable.
+Ikuti [docs/AGENT-INTEGRATION.md](docs/AGENT-INTEGRATION.md). Aplikasi hanya
+bergabung ke network `monitoring` dan mengirim OTLP melalui environment
+variable. Package Go yang dipakai adalah
+`templates/go-service/pkg/observability`, bukan `go-chat/pkg/observability/stack`.
 Jangan menduplikasi stack.
 
 ### Alert baru
