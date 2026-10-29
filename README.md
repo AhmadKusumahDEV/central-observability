@@ -76,8 +76,8 @@ Aplikasi tidak memakai endpoint Prometheus, Loki, atau Tempo secara langsung.
 
 Untuk aplikasi remote, endpoint publik OTLP/HTTP adalah
 `https://otlp.madgo.my.id` dan Grafana tersedia di
-`https://observability.madgo.my.id` setelah Public Hostname dan Access
-ditambahkan di Cloudflare. Detailnya ada di
+`https://observability.madgo.my.id`. Cloudflare Access untuk Grafana masih
+perlu diaktifkan dari dashboard. Detailnya ada di
 [docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md).
 
 ## Contoh aplikasi
