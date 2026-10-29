@@ -110,6 +110,11 @@ database. Yang perlu disalin ke project baru hanya folder
 [pkg/observability](templates/go-service/pkg/observability/observability.go).
 Jangan menyalin stack monitoring ke project aplikasi.
 
+Package Go itu adalah alat bantu untuk aplikasi Go. Aplikasi Node.js, Python,
+Rust, Java, atau bahasa lain memakai exporter OTLP resmi untuk bahasanya dan
+endpoint pusat yang sama. Kontrak yang berlaku lintas bahasa adalah OTLP dan
+resource attribute, bukan package Go.
+
 ## Smoke test
 
 Kirim traces, metrics, dan logs langsung ke Collector lalu verifikasi ketiga

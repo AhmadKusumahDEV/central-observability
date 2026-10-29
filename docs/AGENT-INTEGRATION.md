@@ -4,6 +4,37 @@ Dokumen ini adalah satu file yang dapat diberikan kepada coding agent di repo
 aplikasi. Agent harus membaca dokumen ini dari atas ke bawah, lalu menyalin
 package dari folder `templates/go-service/pkg/observability` di repo pusat.
 
+Kontrak pusatnya adalah **OTLP**, bukan Go. Package Go di folder template adalah
+alat bantu untuk aplikasi Go. Aplikasi Rust, Node.js, Python, Java, .NET, atau
+bahasa lain memakai SDK OpenTelemetry resmi untuk bahasanya dan mengirim ke
+endpoint yang sama. Yang berbeda hanya kode inisialisasi dan middleware;
+Collector, Grafana, Prometheus, Loki, Tempo, Nginx, dan auth pusat tidak perlu
+dibuat ulang.
+
+Contoh bahasa yang sudah tersedia di repo:
+
+- Go: package [templates/go-service/pkg/observability](../templates/go-service/pkg/observability/observability.go).
+- Node.js: [examples/node](../examples/node/app.js).
+- Python: [examples/python](../examples/python/app.py).
+
+Untuk bahasa lain, gunakan exporter OTLP resmi dan pertahankan kontrak resource
+`service.name`, `deployment.environment.name`, dan `service.version`. Jika SDK
+bahasa tersebut belum menyediakan helper logs/metrics yang lengkap, tambahkan
+adapter kecil di aplikasi; itu tetap bukan stack monitoring baru.
+
+| Bahasa | Yang tersedia sekarang | Yang perlu dibuat di aplikasi |
+|---|---|---|
+| Go | Package observability lengkap | Copy folder dan panggil `Setup` |
+| Node.js | Contoh OTLP lengkap | Salin pola `instrumentation.js` |
+| Python | Contoh OTLP lengkap | Salin `telemetry.py` |
+| Rust | Belum ada contoh di repo | Inisialisasi `opentelemetry-rust`, `tracing`, exporter OTLP, lalu instrumentasi HTTP/database |
+| Java/.NET/lain | Belum ada contoh di repo | Gunakan OpenTelemetry SDK resmi dan env OTLP yang sama |
+
+Jadi, untuk Rust kamu tidak membuat ulang Collector, Nginx, atau Grafana. Kamu
+hanya membuat satu file bootstrap OpenTelemetry dan instrumentasi framework
+Rust yang dipakai. Jika nanti ada beberapa project Rust, file bootstrap itu
+bisa dijadikan crate internal bersama.
+
 Jika agent hanya menerima satu file, berikan file ini. Jika agent juga dapat
 membaca repo pusat, berikan folder
 `templates/go-service/pkg/observability`. Folder itu adalah kode yang harus
@@ -850,6 +881,9 @@ curl -X POST http://127.0.0.1:9090/-/reload
 Dokumentasi resmi:
 
 - [OpenTelemetry Go](https://opentelemetry.io/docs/languages/go/)
+- [OpenTelemetry Rust](https://opentelemetry.io/docs/languages/rust/)
+- [OpenTelemetry JavaScript](https://opentelemetry.io/docs/languages/js/)
+- [OpenTelemetry Python](https://opentelemetry.io/docs/languages/python/)
 - [OpenTelemetry Protocol](https://opentelemetry.io/docs/specs/otlp/)
 - [OTLP exporter environment variables](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/)
 - [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
