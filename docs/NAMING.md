@@ -109,10 +109,10 @@ http.response.status_code=200
 Jangan pakai:
 
 ```text
-url.full=https://api.example.com/orders/123?token=...
+url.full=https://api.example.com/orders/123?token=secret
 user.id=982374
-request.id=8f7a...
-trace.id=...
+request.id=8f7a9c1d2e3b4a5c
+trace.id=4bf92f3577b34da6a3ce929d0e0e4736
 timestamp=2026-10-28T20:00:00Z
 ```
 

@@ -1,5 +1,8 @@
 # Operasi, Kapasitas, dan Batasan
 
+Terkait: [README.md](README.md), [INTEGRATION.md](INTEGRATION.md),
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md), dan [ROADMAP.md](ROADMAP.md).
+
 ## Model penyimpanan
 
 Semua backend memakai local filesystem dengan Docker named volume. Ini pilihan
@@ -124,6 +127,12 @@ diarsipkan, lalu service dinyalakan kembali.
 sh scripts/backup.sh
 ```
 
+Di Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\backup.ps1
+```
+
 Script menghasilkan arsip di `backups/<timestamp>/` dan manifest durasi.
 Secret tidak termasuk dalam arsip. Backup secret secara terpisah dengan
 enkripsi.
@@ -136,11 +145,36 @@ Langkah restore ke stack yang benar-benar bersih:
 4. Pulihkan secret dan file konfigurasi dari repository versi yang sesuai.
 5. Jalankan stack dan uji query Prometheus, Loki, Tempo, serta login Grafana.
 6. Verifikasi alert rule, dashboard, dan data historis.
-7. Jalankan smoke test demo atau kirim satu request aplikasi nyata.
+7. Jalankan `sh scripts/smoke-test.sh` atau kirim satu request aplikasi nyata.
 
 Jangan menyalin file TSDB Loki/Prometheus saat container sedang menulis.
 Snapshot native atau storage snapshot lebih baik bila tersedia. Backup harus
 diuji restore; keberadaan arsip saja bukan bukti recoverability.
+
+## Menambah alert
+
+Rule global berada di `config/prometheus/rules/observability-alerts.yml`.
+Alert khusus service dibuat di file terpisah agar mudah ditinjau dan dimiliki:
+
+1. Buat `config/prometheus/rules/chat-api.yml`.
+2. Gunakan label `service_name` dan
+   `deployment_environment_name` secara langsung. Jangan memakai label
+   dinamis.
+3. Tambahkan `for` yang mencegah alert sesaat.
+4. Tambahkan test ke `config/prometheus/tests/chat-api.test.yml`.
+5. Jalankan `make test-rules`.
+6. Reload Prometheus:
+
+```sh
+curl -X POST http://127.0.0.1:9090/-/reload
+```
+
+Contoh rule dan test lengkap ada di
+[INTEGRATION.md](INTEGRATION.md#8-tambahkan-alert-khusus-service).
+
+Rule yang bergantung pada tidak adanya data harus memakai heartbeat atau
+indikator eksplisit. Label tidak boleh berasal dari ID pengguna, URL mentah,
+atau nilai tak terbatas.
 
 ## Alert dan keterbatasan deteksi down
 
@@ -209,9 +243,23 @@ docker compose config --quiet
 make test-rules
 docker compose pull
 docker compose up -d
-sh scripts/e2e-smoke.sh
+sh scripts/smoke-test.sh
 ```
 
 Uji di stack staging terlebih dahulu untuk perubahan major Prometheus, Loki,
 Tempo, atau OTel Collector.
+
+Setelah `docker compose pull`, catat digest image yang lolos tes. Pin
+digest bersama tag versi untuk mencegah image berubah tanpa perubahan
+repository. Jangan gunakan `latest` untuk menghindari upgrade yang
+tidak disengaja.
+
+Tampilkan pemakaian volume sebelum menambah retensi:
+
+```sh
+docker system df -v
+docker run --rm -v central-observability-prometheus-data:/data:ro alpine:3.23.7 du -sh /data
+docker run --rm -v central-observability-loki-data:/data:ro alpine:3.23.7 du -sh /data
+docker run --rm -v central-observability-tempo-data:/data:ro alpine:3.23.7 du -sh /data
+```
 
