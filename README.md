@@ -18,7 +18,10 @@ ikuti [docs/AGENT-INTEGRATION.md](docs/AGENT-INTEGRATION.md).
 | Loki | 3.6.16 | Logs |
 | Tempo | 3.1.1 | Traces |
 | Alertmanager | 0.34.1 | Routing notifikasi |
-| Caddy, profil opsional | 2.11.7 | TLS dan auth untuk endpoint remote |
+| Nginx di VPS, di luar stack | 1.25.5-alpine | Edge Cloudflare Tunnel untuk Grafana dan OTLP |
+
+Profil Caddy tetap tersedia untuk pengembangan lokal, tetapi jangan
+mengaktifkannya bersamaan dengan Nginx di VPS.
 
 Semua image memakai tag versi yang dikunci, bukan `latest`.
 
@@ -70,6 +73,12 @@ http://otel-collector:4318
 ```
 
 Aplikasi tidak memakai endpoint Prometheus, Loki, atau Tempo secara langsung.
+
+Untuk aplikasi remote, endpoint publik OTLP/HTTP adalah
+`https://otlp.madgo.my.id` dan Grafana tersedia di
+`https://observability.madgo.my.id` setelah Public Hostname dan Access
+ditambahkan di Cloudflare. Detailnya ada di
+[docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md).
 
 ## Contoh aplikasi
 
@@ -135,6 +144,7 @@ Generator membuat `otel.env`, `docker-compose.yml`, dan
 - [Dokumentasi utama](docs/README.md)
 - [Panduan agent untuk project baru](docs/AGENT-INTEGRATION.md)
 - [Integrasi langkah demi langkah](docs/INTEGRATION.md)
+- [Akses online, Nginx, dan Cloudflare](docs/ONLINE-ACCESS.md)
 - [Aturan nama dan label](docs/NAMING.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Operasi, retensi, backup, dan alert](docs/OPERATIONS.md)
@@ -147,7 +157,7 @@ Generator membuat `otel.env`, `docker-compose.yml`, dan
 - Backend hanya berada di network internal.
 - Port administrasi dipetakan ke loopback host.
 - Jangan membuka Collector 4317/4318 atau backend langsung ke internet.
-- Untuk server remote, gunakan VPN atau profil Caddy dengan TLS dan
-  autentikasi.
+- Untuk server remote, gunakan Cloudflare Tunnel + Nginx dengan OTLP/HTTP dan
+  Basic auth per aplikasi seperti di [docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md).
 - Jangan commit isi folder `secrets/`.
 

@@ -6,7 +6,8 @@ tidak dijelaskan.
 
 Dokumen pendukung: [AGENT-INTEGRATION.md](AGENT-INTEGRATION.md),
 [NAMING.md](NAMING.md), [TROUBLESHOOTING.md](TROUBLESHOOTING.md),
-[OPERATIONS.md](OPERATIONS.md), [examples/](../examples/), dan
+[OPERATIONS.md](OPERATIONS.md), [ONLINE-ACCESS.md](ONLINE-ACCESS.md),
+[examples/](../examples/), dan
 [templates/go-service/](../templates/go-service/).
 
 ## 1. Prasyarat
@@ -108,19 +109,22 @@ dikirim.
 
 ### Akses remote
 
-Rekomendasi pertama adalah Tailscale atau WireGuard. Jika memakai profil Caddy
-dari repository ini, gunakan:
+VPS pusat memakai Cloudflare Tunnel + Nginx. Endpoint OTLP/HTTP publik untuk
+aplikasi remote adalah:
 
 ```dotenv
-OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com:443
-OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-OTEL_EXPORTER_OTLP_HEADERS=authorization=Basic%20b3RlbC13cml0ZXI6cGFzc3dvcmQtYW5kYQ%3D%3D
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.madgo.my.id
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20BASE64_URLENCODED
+OTEL_EXPORTER_OTLP_TIMEOUT=10000
+OTEL_EXPORTER_OTLP_COMPRESSION=gzip
 ```
 
-Nilai header harus URL-decoded oleh SDK. Ganti contoh credential dengan milik
-Anda, lalu ubah `+`, `/`, dan `=` pada base64 menjadi
-`%2B`, `%2F`, dan `%3D`. Aktifkan profil ingress
-sesuai [README.md](README.md) dan [OPERATIONS.md](OPERATIONS.md).
+`BASE64_URLENCODED` dibuat dari `user:password` lalu di-URL-encode. Buat user
+per aplikasi dengan `deploy/nginx/add-otlp-client.sh` di VPS. Jika Cloudflare
+Access Service Auth aktif, tambahkan header service token ke nilai yang sama.
+Port 4317/4318 tidak dibuka ke internet; OTLP/HTTP masuk melalui 443 ke Nginx.
+Dokumen lengkap ada di [ONLINE-ACCESS.md](ONLINE-ACCESS.md).
 
 ## 5. Tambahkan inisialisasi OpenTelemetry
 
@@ -741,8 +745,8 @@ khusus.
 ## 9. Checklist akhir
 
 - [ ] Service bergabung ke network `monitoring`.
-- [ ] Endpoint mengarah ke `otel-collector:4317` atau
-      `otel-collector:4318`.
+- [ ] Endpoint same-host mengarah ke `otel-collector:4317`/`4318`; endpoint
+      remote mengarah ke `https://otlp.madgo.my.id` dengan `http/protobuf`.
 - [ ] `OTEL_SERVICE_NAME` mengikuti [NAMING.md](NAMING.md).
 - [ ] `deployment.environment.name` berisi `dev`,
       `staging`, atau `prod`.

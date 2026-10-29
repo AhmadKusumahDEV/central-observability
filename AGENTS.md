@@ -14,10 +14,17 @@ Grafana, Prometheus, Loki, Tempo, Collector, atau Alertmanager sendiri.
 ## Aturan yang tidak boleh dilanggar
 
 - Jangan menambahkan service monitoring ke Compose aplikasi client.
+- Edge publik adalah Cloudflare Tunnel yang sudah ada menuju Nginx internal.
+  Jangan mengaktifkan profil Caddy bersamaan dengan Nginx.
+- Jangan membuka port 80/443/3000/9090/9093/3100/3200/4317/4318 ke host atau
+  internet. Backend hanya boleh dijangkau lewat network Docker internal.
+- Endpoint remote memakai OTLP/HTTP di Cloudflare Tunnel dan Basic auth per
+  aplikasi. OTLP gRPC tetap untuk aplikasi same-host; Cloudflare Access tidak
+  melindungi gRPC.
 - Aplikasi bergabung ke external network `monitoring`. Backend hanya
   berada di network internal `central-observability-internal`.
-- Jangan mengekspos backend ke internet. Hanya Collector yang boleh menjadi
-  pintu masuk telemetry.
+- Jangan mengekspos backend ke internet. Hanya Grafana dan OTLP/HTTP yang
+  boleh memiliki hostname publik; keduanya masuk lewat Nginx/Tunnel.
 - Gunakan image dan library dengan versi tertentu. Jangan memakai
   `latest` atau rentang versi yang dapat berubah diam-diam.
 - Semua perubahan provisioning harus berada di file repository. Jangan
@@ -40,6 +47,8 @@ Grafana, Prometheus, Loki, Tempo, Collector, atau Alertmanager sendiri.
 5. [docs/OPERATIONS.md](docs/OPERATIONS.md) untuk retensi, backup, upgrade, dan
    alert.
 6. [docs/ROADMAP.md](docs/ROADMAP.md) untuk batasan dan rencana berikutnya.
+7. [docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md) untuk akses publik, Nginx,
+   Cloudflare Tunnel, dan keamanan endpoint remote.
 
 ## Peta file
 
@@ -53,7 +62,8 @@ Grafana, Prometheus, Loki, Tempo, Collector, atau Alertmanager sendiri.
 | `config/alertmanager/` | Routing notifikasi |
 | `grafana/provisioning/` | Datasource yang dibuat otomatis |
 | `grafana/dashboards/` | Dashboard JSON sebagai kode |
-| `ingress/` | TLS dan autentikasi untuk endpoint remote |
+| `ingress/` | Profil Caddy lama; tidak dipakai saat Nginx menjadi edge |
+| `deploy/` | Overlay produksi, config Nginx, dan prosedur akses online |
 | `examples/` | Aplikasi contoh dan Compose client |
 | `templates/go-service/` | Template Go yang bisa disalin ke project baru |
 | `docs/AGENT-INTEGRATION.md` | Instruksi integrasi untuk agent di repo aplikasi |
@@ -68,6 +78,10 @@ bergabung ke network `monitoring` dan mengirim OTLP melalui environment
 variable. Package Go yang dipakai adalah
 `templates/go-service/pkg/observability`, bukan `go-chat/pkg/observability/stack`.
 Jangan menduplikasi stack.
+
+Untuk akses publik, baca [docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md) dan
+[deploy/nginx/README.md](deploy/nginx/README.md). Secret Nginx berada di
+`nginx/secrets/` di VPS dan tidak boleh masuk repository.
 
 ### Alert baru
 
@@ -95,11 +109,18 @@ make test-rules
 sh scripts/smoke-test.sh
 ```
 
-Jika mengubah Caddy atau ingress:
+Jika mengubah Caddy lokal atau ingress Nginx:
 
 ```sh
 docker run --rm -it caddy:2.11.7 caddy validate \
   --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+Untuk Nginx di VPS:
+
+```sh
+docker exec nginx-proxy nginx -t
+docker compose -f compose.yaml -f deploy/compose.prod.yml config --quiet
 ```
 
 ## Definisi selesai

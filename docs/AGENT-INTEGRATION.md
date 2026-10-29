@@ -16,6 +16,8 @@ Dokumen pendukung:
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) jika data tidak masuk.
 - [OPERATIONS.md](OPERATIONS.md) untuk retensi, backup, dan upgrade.
 - [INTEGRATION.md](INTEGRATION.md) untuk penjelasan umum integrasi.
+- [ONLINE-ACCESS.md](ONLINE-ACCESS.md) untuk akses remote, Nginx, dan
+  Cloudflare.
 - [Template Go](../templates/go-service/README.md) untuk aplikasi contoh yang
   sudah mengirim traces, metrics, dan logs.
 - [VERIFICATION.md](VERIFICATION.md) untuk hasil uji template terhadap stack
@@ -199,7 +201,7 @@ Penjelasan setiap baris:
 | Variabel | Arti |
 |---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Alamat Collector. Dari container aplikasi gunakan `otel-collector:4317`. |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` untuk port 4317; `http/protobuf` untuk port 4318. Package template memakai gRPC. |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` untuk same-host; `http/protobuf` untuk remote melalui Cloudflare Tunnel. |
 | `OTEL_SERVICE_NAME` | Nama service yang muncul di dashboard. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Environment, namespace, dan versi. |
 | `OTEL_TRACES_SAMPLER` | Strategi sampling trace. |
@@ -210,17 +212,31 @@ Penjelasan setiap baris:
 | `OBSERVABILITY_HEARTBEAT_INTERVAL` | Interval heartbeat service. |
 | `APP_ADDR` | Alamat HTTP aplikasi di dalam container. |
 
-Untuk server remote, jangan membuka port 4317 atau 4318 ke internet. Gunakan
-Tailscale/WireGuard atau profil Caddy di repo pusat. Contoh endpoint remote:
+Untuk server remote, jangan membuka port 4317 atau 4318 ke internet. VPS pusat
+memakai Cloudflare Tunnel dan Nginx; endpoint publiknya adalah OTLP/HTTP di
+`https://otlp.madgo.my.id`. Contoh env remote:
 
 ```dotenv
-OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com:443
-OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-OTEL_EXPORTER_OTLP_HEADERS=authorization=Basic%20b3RlbC13cml0ZXI6cGFzc3dvcmQtYW5kYQ%3D%3D
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.madgo.my.id
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20BASE64_URLENCODED
+OTEL_EXPORTER_OTLP_TIMEOUT=10000
+OTEL_EXPORTER_OTLP_COMPRESSION=gzip
 ```
 
-Nilai header harus sudah di-URL-decode satu kali. Ganti contoh credential
-dengan credential yang dibuat di server pusat. Jangan commit credential ke Git.
+`BASE64_URLENCODED` adalah base64 dari `user:password` yang sudah di-URL-encode.
+Buat user per aplikasi dengan
+`deploy/nginx/add-otlp-client.sh`; script mencetak nilai siap pakai. Jangan
+memakai satu password untuk semua aplikasi. Jika Cloudflare Access Service Auth
+aktif, tambahkan `CF-Access-Client-Id` dan `CF-Access-Client-Secret` ke nilai
+header yang sama. Jangan commit credential ke Git.
+
+Package template mendukung `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`; cukup
+ganti env, tanpa mengubah kode aplikasi. Aplikasi same-host tetap boleh memakai
+gRPC `http://otel-collector:4317`.
+
+Detail keamanan, DNS, dan langkah Cloudflare ada di
+[ONLINE-ACCESS.md](ONLINE-ACCESS.md).
 
 ## 7. Panggil Setup di `main.go`
 
@@ -797,8 +813,8 @@ curl -X POST http://127.0.0.1:9090/-/reload
       `go-chat/pkg/observability/stack`.
 - [ ] `OTEL_SERVICE_NAME` mengikuti [NAMING.md](NAMING.md).
 - [ ] `deployment.environment.name` berisi `dev`, `staging`, atau `prod`.
-- [ ] `OTEL_EXPORTER_OTLP_ENDPOINT` mengarah ke `otel-collector:4317` atau
-      `otel-collector:4318`.
+- [ ] Aplikasi same-host memakai `otel-collector:4317`/`4318`; aplikasi remote
+      memakai `https://otlp.madgo.my.id` dengan `http/protobuf`.
 - [ ] Traces, metrics, dan logs sama-sama memakai endpoint Collector.
 - [ ] Tidak ada `OBSERVABILITY_LOKI_URL` yang mengarah ke Loki pusat.
 - [ ] `observability.Setup` dipanggil sebelum HTTP server.

@@ -111,6 +111,39 @@ di-provision juga berhasil:
 Ini membuktikan Grafana dapat membaca ketiga backend dengan datasource UID
 `prometheus-main`, `loki-main`, dan `tempo-main`.
 
+## Uji di VPS produksi
+
+Stack pusat dipasang di `/home/ahmadkusumahdev/central-observability` dengan
+overlay `deploy/compose.prod.yml`. Nginx VPS memakai config
+`deploy/nginx/observability.conf` dan external network
+`observability-ingress`.
+
+Status yang diperiksa:
+
+- Collector, Prometheus, Loki, Tempo, Grafana, dan Alertmanager berstatus up.
+- `/-/ready` Prometheus, `/ready` Loki, `/ready` Tempo, `/api/health` Grafana,
+  dan `/-/ready` Alertmanager mengembalikan 200 setelah startup selesai.
+- `https://observability.madgo.my.id/login` mengembalikan halaman Grafana dan
+  login admin berhasil.
+- `https://otlp.madgo.my.id/healthz` mengembalikan 200.
+- Request OTLP tanpa kredensial mengembalikan 401; dengan kredensial per
+  aplikasi mengembalikan 200.
+- `telemetrygen` melalui endpoint publik mengirim traces, metrics, dan logs dan
+  ketiganya muncul di backend.
+- Template app dijalankan dengan endpoint publik, `http/protobuf`, dan
+  environment `prod`. Prometheus menerima histogram `/work` dan `/downstream`,
+  Loki menerima log dengan `trace_id`, dan Tempo menerima trace
+  `dec7021d2832bd31d5c2382600b61f75`.
+- Grafana API membaca dashboard `central-service-overview` dan datasource
+  `prometheus-main`, `loki-main`, serta `tempo-main`.
+- `sudo sh scripts/smoke-test.sh` lulus untuk metrics, logs, dan traces.
+
+Satu masalah produksi ditemukan dan diperbaiki: file secret Grafana dan
+Alertmanager awalnya `0600`, sehingga container non-root tidak dapat membaca
+`/run/secrets/*`. File secret sekarang `0644` pada VPS satu-user ini; akses
+host tetap dibatasi dan file tidak masuk Git. Password admin Grafana di-reset
+dari file secret setelah permission diperbaiki.
+
 ## Smoke test dan alert
 
 ```sh
@@ -136,7 +169,10 @@ Smoke test selesai: metrics, logs, dan traces dari service 'smoke-test' diterima
 
 - Pengiriman notifikasi Telegram, Slack, atau email secara nyata. Rule dan
   routing sudah dimuat, tetapi pengiriman ke channel eksternal tidak
-  dijalankan dalam uji ini.
+  dijalankan dalam uji ini. Secret Telegram masih placeholder.
+- Cloudflare Access untuk `observability.madgo.my.id` belum diaktifkan pada
+  saat uji. Halaman login Grafana sudah aktif dan rate limit login Nginx sudah
+  dipasang, tetapi MFA/SSO Access perlu ditambahkan di dashboard Cloudflare.
 - Klik manual tombol `TraceID` di UI Grafana. Datasource Loki dan Tempo sudah
   diuji lewat API Grafana, dan field `trace_id` sudah ada di log.
 - Retensi jangka panjang, kapasitas disk produksi, dan restore backup.

@@ -10,13 +10,15 @@ dan exemplar.
 ```mermaid
 flowchart LR
     APP[Aplikasi di network monitoring] -->|OTLP| COL[OTel Collector]
-    REMOTE[Aplikasi remote] -->|HTTPS + auth| CADDY[Caddy ingress]
-    CADDY --> COL
+    REMOTE[Aplikasi remote] -->|HTTPS + auth| CF[Cloudflare Tunnel]
+    CF --> NGINX[Nginx VPS]
+    NGINX -->|OTLP/HTTP| COL
+    NGINX -->|HTTPS| GRAF[Grafana]
     COL --> TEMPO[Tempo traces]
     COL --> LOKI[Loki logs]
     COL --> PROM[Prometheus metrics]
     PROM --> AM[Alertmanager]
-    GRAF[Grafana] --> PROM
+    GRAF --> PROM
     GRAF --> LOKI
     GRAF --> TEMPO
 ```
@@ -37,9 +39,12 @@ terbuka untuk aplikasi.
 | Loki | Tidak untuk aplikasi | `http://127.0.0.1:3100` |
 | Tempo | Tidak untuk aplikasi | `http://127.0.0.1:3200` |
 | Alertmanager | Tidak untuk aplikasi | `http://127.0.0.1:9093` |
+| Grafana remote | Tidak untuk aplikasi | `https://observability.madgo.my.id` |
+| OTLP/HTTP remote | `https://otlp.madgo.my.id` | `https://otlp.madgo.my.id` |
 
-Untuk server remote, gunakan Tailscale/WireGuard atau aktifkan profil Caddy
-sesuai [INTEGRATION.md](INTEGRATION.md).
+Untuk server remote, gunakan Cloudflare Tunnel + Nginx sesuai
+[ONLINE-ACCESS.md](ONLINE-ACCESS.md). Tailscale/WireGuard tetap pilihan yang
+lebih kuat untuk akses admin dan gRPC privat.
 
 ## Mulai dari mana
 
@@ -71,6 +76,8 @@ Dokumen lengkap:
 6. [ROADMAP.md](ROADMAP.md): batasan dan rencana berikutnya.
 7. [adr/README.md](adr/README.md): alasan keputusan arsitektur.
 8. [AGENTS.md](../AGENTS.md): kontrak kerja untuk coding agent.
+9. [ONLINE-ACCESS.md](ONLINE-ACCESS.md): akses publik, Nginx, Cloudflare
+   Tunnel, dan keamanan endpoint remote.
 
 Hasil uji template dan smoke test terakhir ada di
 [VERIFICATION.md](VERIFICATION.md).
