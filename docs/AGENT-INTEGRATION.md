@@ -35,6 +35,11 @@ hanya membuat satu file bootstrap OpenTelemetry dan instrumentasi framework
 Rust yang dipakai. Jika nanti ada beberapa project Rust, file bootstrap itu
 bisa dijadikan crate internal bersama.
 
+Jika kamu sudah menyalin `pkg/observability` terlebih dahulu, gunakan
+[templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) sebagai
+prompt singkat untuk agent aplikasi. Prompt itu sudah mengasumsikan package
+tersebut ada, sehingga agent hanya membuat env dan wiring.
+
 ## File Markdown di repo aplikasi
 
 Setiap repo aplikasi sebaiknya punya satu `AGENTS.md` di root. Isinya adalah
@@ -890,7 +895,8 @@ curl -X POST http://127.0.0.1:9090/-/reload
 ## 16. Urutan kerja yang harus dilakukan agent
 
 1. Baca [NAMING.md](NAMING.md) dan tentukan nama service final.
-2. Salin folder `pkg/observability` dari template pusat.
+2. Salin folder `pkg/observability` dari template pusat. Jika folder itu sudah
+   ada di project, lewati langkah ini.
 3. Tambahkan dependency dengan versi pin dan jalankan `go mod tidy`.
 4. Buat `otel.env` dari contoh di bagian 6.
 5. Ubah `main.go` mengikuti bagian 7.
