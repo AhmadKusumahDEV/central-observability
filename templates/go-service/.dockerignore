@@ -1,0 +1,8 @@
+.git
+.env
+otel.env
+README.md
+**/*_test.go
+app
+app.exe
+*.log
