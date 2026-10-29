@@ -75,7 +75,10 @@ type Config struct {
 	Compression string
 
 	// SampleRatio 1 menyimpan semua trace; 0.1 menyimpan sekitar 10 persen.
-	SampleRatio float64
+	// SampleRatioSet membedakan nilai 0 yang disengaja dari nilai zero-value
+	// Config yang belum diisi. ConfigFromEnv mengisi field ini.
+	SampleRatio    float64
+	SampleRatioSet bool
 
 	LogLevel string
 
@@ -114,6 +117,7 @@ func ConfigFromEnv() Config {
 		Headers:           parseKVList(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")),
 		Compression:       strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_COMPRESSION")),
 		SampleRatio:       1,
+		SampleRatioSet:    true,
 		LogLevel:          firstNonEmpty(os.Getenv("OBSERVABILITY_LOG_LEVEL"), os.Getenv("LOG_LEVEL"), "info"),
 		MetricInterval:    defaultMetricEvery,
 		HeartbeatInterval: defaultHeartbeat,
@@ -122,9 +126,19 @@ func ConfigFromEnv() Config {
 	if value := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_INSECURE")); value != "" {
 		cfg.Insecure = parseBool(value)
 	}
+	sampler := strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER")))
+	switch sampler {
+	case "always_off", "parentbased_always_off":
+		cfg.SampleRatio = 0
+		cfg.SampleRatioSet = true
+	case "always_on", "parentbased_always_on":
+		cfg.SampleRatio = 1
+		cfg.SampleRatioSet = true
+	}
 	if value := strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER_ARG")); value != "" {
 		if ratio, err := strconv.ParseFloat(value, 64); err == nil {
 			cfg.SampleRatio = ratio
+			cfg.SampleRatioSet = true
 		}
 	}
 	if value := strings.TrimSpace(os.Getenv("OTEL_METRIC_EXPORT_INTERVAL")); value != "" {
@@ -138,6 +152,11 @@ func ConfigFromEnv() Config {
 		}
 	}
 	if value := strings.TrimSpace(os.Getenv("OBSERVABILITY_ENABLED")); value != "" && !parseBool(value) {
+		cfg.DisableTraces = true
+		cfg.DisableMetrics = true
+		cfg.DisableLogs = true
+	}
+	if value := strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")); value != "" && parseBool(value) {
 		cfg.DisableTraces = true
 		cfg.DisableMetrics = true
 		cfg.DisableLogs = true
@@ -174,7 +193,10 @@ func Setup(ctx context.Context, cfg Config) (*Stack, error) {
 	if strings.TrimSpace(cfg.LogLevel) == "" {
 		cfg.LogLevel = "info"
 	}
-	if cfg.SampleRatio <= 0 {
+	if cfg.SampleRatio < 0 {
+		cfg.SampleRatio = 0
+	}
+	if !cfg.SampleRatioSet && cfg.SampleRatio == 0 {
 		cfg.SampleRatio = 1
 	}
 	if cfg.MetricInterval <= 0 {
@@ -452,14 +474,14 @@ func signalEndpoint(base, suffix string, forceInsecure bool) (string, bool, erro
 
 func shutdownProviders(ctx context.Context, logs *sdklog.LoggerProvider, metrics *sdkmetric.MeterProvider, traces *sdktrace.TracerProvider) error {
 	var errs []error
-	if logs != nil {
-		errs = append(errs, logs.Shutdown(ctx))
+	if traces != nil {
+		errs = append(errs, traces.Shutdown(ctx))
 	}
 	if metrics != nil {
 		errs = append(errs, metrics.Shutdown(ctx))
 	}
-	if traces != nil {
-		errs = append(errs, traces.Shutdown(ctx))
+	if logs != nil {
+		errs = append(errs, logs.Shutdown(ctx))
 	}
 
 	return errors.Join(errs...)
@@ -629,11 +651,16 @@ func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 }
 
 func routeFromRequest(r *http.Request) string {
-	if r.Pattern != "" {
-		return r.Pattern
+	if r.Pattern == "" {
+		return ""
+	}
+	// ServeMux dengan pola method menghasilkan "GET /work". Label route harus
+	// berupa template path tanpa method.
+	if _, pattern, ok := strings.Cut(r.Pattern, " "); ok {
+		return pattern
 	}
 
-	return "unmatched"
+	return r.Pattern
 }
 
 func routeOrUnmatched(route string) string {
