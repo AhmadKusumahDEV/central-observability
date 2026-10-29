@@ -1,4 +1,6 @@
 /app
 /app.exe
+/app-*.exe
 /*.stdout.log
 /*.stderr.log
+/*.log
