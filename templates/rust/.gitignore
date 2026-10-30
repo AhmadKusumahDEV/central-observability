@@ -1,0 +1,9 @@
+target/
+otel.env
+otel.*.env
+!otel.env.example
+.env
+.env.*
+!.env.example
+secrets/
+*.log

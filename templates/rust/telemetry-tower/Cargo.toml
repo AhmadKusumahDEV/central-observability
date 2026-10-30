@@ -1,0 +1,18 @@
+[package]
+name = "observability-tower"
+version = "0.1.0"
+description = "Tower layer that records OpenTelemetry server spans"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+http.workspace = true
+observability-telemetry = { path = "../telemetry" }
+opentelemetry.workspace = true
+tower.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
