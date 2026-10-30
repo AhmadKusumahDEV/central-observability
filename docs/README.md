@@ -109,9 +109,16 @@ Folder [examples](../examples/) berisi aplikasi Go, Node.js, dan Python yang
 masing-masing menghasilkan traces, histogram, logs, heartbeat, HTTP client
 span, dan SQLite database span.
 
-Folder [templates/go-service](../templates/go-service/) berisi template Go yang
-dapat disalin ke project baru. Package observability-nya sudah memakai OTLP
-untuk ketiga sinyal dan tidak menjalankan stack monitoring sendiri.
+Folder `templates/` berisi template per bahasa yang dapat disalin ke project
+baru. Setiap template memakai OTLP untuk ketiga sinyal dan tidak menjalankan
+stack monitoring sendiri.
+
+| Bahasa | Template | Prompt untuk agent |
+|---|---|---|
+| Go | [templates/go-service](../templates/go-service/README.md) | [templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) |
+| Node.js | [templates/node](../templates/node/README.md) | [templates/node/APP-AGENT-PROMPT.md](../templates/node/APP-AGENT-PROMPT.md) |
+| PHP | [templates/php](../templates/php/README.md) | [templates/php/APP-AGENT-PROMPT.md](../templates/php/APP-AGENT-PROMPT.md) |
+| Rust | [templates/rust](../templates/rust/README.md) | [templates/rust/APP-AGENT-PROMPT.md](../templates/rust/APP-AGENT-PROMPT.md) |
 
 ```sh
 docker compose -f examples/docker-compose.client.yml --profile go up -d --build
