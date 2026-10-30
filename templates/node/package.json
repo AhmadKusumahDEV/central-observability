@@ -1,0 +1,26 @@
+{
+  "name": "central-observability-node-template",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-agnostic OpenTelemetry bootstrap for Node.js",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "start": "node --require ./instrumentation.js src/app.js",
+    "check": "node --check instrumentation.js && node --check src/app.js && node --check src/observability/config.js && node --check src/observability/start.js && node --check src/observability/runtime.js && node --check src/observability/http.js && node --check src/observability/log.js && node --check src/observability/index.js && node --check src/adapters/express.js && node --check src/adapters/fastify.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.300.0",
+    "@opentelemetry/exporter-logs-otlp-proto": "0.300.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.300.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.300.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.300.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.300.0",
+    "@opentelemetry/resources": "3.0.0",
+    "@opentelemetry/sdk-logs": "3.0.0",
+    "@opentelemetry/sdk-metrics": "3.0.0",
+    "@opentelemetry/sdk-node": "0.300.0"
+  }
+}
