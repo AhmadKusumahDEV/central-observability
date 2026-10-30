@@ -1,0 +1,35 @@
+{
+  "name": "example/php-observability-template",
+  "description": "Framework-agnostic OpenTelemetry bootstrap for PHP",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.3",
+    "ext-json": "*",
+    "ext-curl": "*",
+    "ext-zlib": "*",
+    "open-telemetry/api": "1.10.1",
+    "open-telemetry/sdk": "1.15.0",
+    "open-telemetry/exporter-otlp": "1.4.0",
+    "open-telemetry/sem-conv": "1.44.0",
+    "psr/log": "3.0.2",
+    "psr/http-server-middleware": "1.0.2",
+    "guzzlehttp/guzzle": "8.3.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Observability\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Observability\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "php tests/run.php"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
