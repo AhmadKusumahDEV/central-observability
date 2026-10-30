@@ -102,18 +102,23 @@ Port host: Go `8081`, Node `8082`, Python `8083`. File Compose
 client hanya berisi aplikasi dan network; seluruh komponen monitoring berada
 di stack pusat.
 
-## Template Go untuk project baru
+## Template untuk project baru
 
-[templates/go-service](templates/go-service/) adalah project Go kecil yang
-sudah mengirim traces, histogram, logs, heartbeat, span HTTP keluar, dan span
-database. Yang perlu disalin ke project baru hanya folder
-[pkg/observability](templates/go-service/pkg/observability/observability.go).
-Jangan menyalin stack monitoring ke project aplikasi.
+Setiap bahasa punya satu template yang mengirim traces, histogram, logs, dan
+heartbeat ke Collector pusat. Salin foldernya ke project aplikasi; jangan
+menyalin stack monitoring.
 
-Package Go itu adalah alat bantu untuk aplikasi Go. Aplikasi Node.js, Python,
-Rust, Java, atau bahasa lain memakai exporter OTLP resmi untuk bahasanya dan
-endpoint pusat yang sama. Kontrak yang berlaku lintas bahasa adalah OTLP dan
-resource attribute, bukan package Go.
+| Bahasa | Folder yang disalin | Panduan |
+|---|---|---|
+| Go | [pkg/observability](templates/go-service/pkg/observability/observability.go) | [templates/go-service](templates/go-service/README.md) |
+| Node.js | [src/observability](templates/node/src/observability) dan `src/adapters/` | [templates/node](templates/node/README.md) |
+| PHP | [src/](templates/php/src) dan `bin/heartbeat.php` | [templates/php](templates/php/README.md) |
+| Rust | [telemetry/](templates/rust/telemetry) dan `telemetry-tower/` | [templates/rust](templates/rust/README.md) |
+
+Setiap folder punya `README.md` yang menjelaskan file yang disalin dan
+`APP-AGENT-PROMPT.md` yang bisa diisi lalu diberikan ke agent di repo aplikasi.
+Kontrak yang berlaku lintas bahasa adalah OTLP dan resource attribute
+`service.name`, `deployment.environment.name`, dan `service.version`.
 
 ## Smoke test
 

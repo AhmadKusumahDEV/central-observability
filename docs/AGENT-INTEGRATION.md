@@ -24,29 +24,21 @@ endpoint yang sama. Yang berbeda hanya kode inisialisasi dan middleware;
 Collector, Grafana, Prometheus, Loki, Tempo, Nginx, dan auth pusat tidak perlu
 dibuat ulang.
 
-Contoh bahasa yang sudah tersedia di repo:
+Template per bahasa yang bisa disalin langsung ke project aplikasi:
 
-- Go: package [templates/go-service/pkg/observability](../templates/go-service/pkg/observability/observability.go).
-- Node.js: [examples/node](../examples/node/app.js).
-- Python: [examples/python](../examples/python/app.py).
+| Bahasa | Yang disalin | Prompt untuk agent | Catatan |
+|---|---|---|---|
+| Go | [templates/go-service/pkg/observability](../templates/go-service/pkg/observability/observability.go) | [templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) | Sudah teruji ke stack pusat |
+| Node.js | [templates/node](../templates/node/README.md): `src/observability/`, `src/adapters/`, `instrumentation.js` | [templates/node/APP-AGENT-PROMPT.md](../templates/node/APP-AGENT-PROMPT.md) | Tanpa import framework di kode inti |
+| PHP | [templates/php](../templates/php/README.md): `src/`, `bin/heartbeat.php` | [templates/php/APP-AGENT-PROMPT.md](../templates/php/APP-AGENT-PROMPT.md) | Heartbeat harus proses terpisah |
+| Rust | [templates/rust](../templates/rust/README.md): `telemetry/`, `telemetry-tower/` | [templates/rust/APP-AGENT-PROMPT.md](../templates/rust/APP-AGENT-PROMPT.md) | Crate inti tanpa axum/actix |
+| Python, Java, .NET | Belum ada template | Pakai [templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) dengan SDK resmi | Kontrak resource tetap sama |
 
-Untuk bahasa lain, gunakan exporter OTLP resmi dan pertahankan kontrak resource
-`service.name`, `deployment.environment.name`, dan `service.version`. Jika SDK
-bahasa tersebut belum menyediakan helper logs/metrics yang lengkap, tambahkan
-adapter kecil di aplikasi; itu tetap bukan stack monitoring baru.
-
-| Bahasa | Yang tersedia sekarang | Yang perlu dibuat di aplikasi |
-|---|---|---|
-| Go | Package observability lengkap | Copy folder dan panggil `Setup` |
-| Node.js | Contoh OTLP lengkap | Salin pola `instrumentation.js` |
-| Python | Contoh OTLP lengkap | Salin `telemetry.py` |
-| Rust | Belum ada contoh di repo | Inisialisasi `opentelemetry-rust`, `tracing`, exporter OTLP, lalu instrumentasi HTTP/database |
-| Java/.NET/lain | Belum ada contoh di repo | Gunakan OpenTelemetry SDK resmi dan env OTLP yang sama |
-
-Jadi, untuk Rust kamu tidak membuat ulang Collector, Nginx, atau Grafana. Kamu
-hanya membuat satu file bootstrap OpenTelemetry dan instrumentasi framework
-Rust yang dipakai. Jika nanti ada beberapa project Rust, file bootstrap itu
-bisa dijadikan crate internal bersama.
+Untuk bahasa yang belum punya template, gunakan exporter OTLP resmi dan
+pertahankan kontrak resource `service.name`, `deployment.environment.name`, dan
+`service.version`. Jika SDK bahasa tersebut belum menyediakan helper
+logs/metrics yang lengkap, tambahkan adapter kecil di aplikasi; itu tetap bukan
+stack monitoring baru.
 
 Jika kamu sudah menyalin `pkg/observability` terlebih dahulu, gunakan
 [templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) sebagai
@@ -92,8 +84,9 @@ Dokumen pendukung:
 - [INTEGRATION.md](INTEGRATION.md) untuk penjelasan umum integrasi.
 - [ONLINE-ACCESS.md](ONLINE-ACCESS.md) untuk akses remote, Nginx, dan
   Cloudflare.
-- [Template Go](../templates/go-service/README.md) untuk aplikasi contoh yang
-  sudah mengirim traces, metrics, dan logs.
+- Template per bahasa: [Go](../templates/go-service/README.md),
+  [Node.js](../templates/node/README.md), [PHP](../templates/php/README.md),
+  [Rust](../templates/rust/README.md).
 - [VERIFICATION.md](VERIFICATION.md) untuk hasil uji template terhadap stack
   pusat.
 

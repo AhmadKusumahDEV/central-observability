@@ -68,6 +68,9 @@ Grafana, Prometheus, Loki, Tempo, Collector, atau Alertmanager sendiri.
 | `deploy/` | Overlay produksi, config Nginx, dan prosedur akses online |
 | `examples/` | Aplikasi contoh dan Compose client |
 | `templates/go-service/` | Template Go yang bisa disalin ke project baru |
+| `templates/node/` | Template Node.js tanpa ketergantungan framework di kode inti |
+| `templates/php/` | Template PHP tanpa ketergantungan framework di kode inti |
+| `templates/rust/` | Workspace Rust: crate `telemetry` dan `telemetry-tower` |
 | `docs/AGENT-INTEGRATION.md` | Instruksi integrasi untuk agent di repo aplikasi |
 | `scripts/` | Inisialisasi, smoke test, generator, dan backup |
 
