@@ -1,0 +1,13 @@
+[package]
+name = "observability-example-axum"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+axum.workspace = true
+observability-telemetry = { path = "../../telemetry" }
+observability-tower = { path = "../../telemetry-tower" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "signal"] }
+tracing.workspace = true

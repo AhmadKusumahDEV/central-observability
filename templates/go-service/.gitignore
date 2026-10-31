@@ -1,4 +1,14 @@
 /app
 /app.exe
+/app-*.exe
 /*.stdout.log
 /*.stderr.log
+/*.log
+.env
+.env.*
+!.env.example
+otel.env
+otel.*.env
+!otel.env.example
+secrets/
+*.htpasswd

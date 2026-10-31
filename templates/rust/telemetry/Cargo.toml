@@ -1,0 +1,21 @@
+[package]
+name = "observability-telemetry"
+version = "0.1.0"
+description = "Framework-agnostic OpenTelemetry setup for Rust services"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+http.workspace = true
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry-appender-tracing.workspace = true
+opentelemetry-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+tokio = { workspace = true, features = ["macros", "rt", "time"] }

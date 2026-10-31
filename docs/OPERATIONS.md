@@ -99,9 +99,9 @@ Batas yang sudah diterapkan:
 
 Yang perlu diperhatikan:
 
-- Basic auth pada Caddy adalah pilihan fallback. TLS wajib dan token perlu
-  dirotasi. Basic auth tidak memberikan tenant isolation dan tidak mengikat
-  identitas ke `service.name`.
+- Basic auth pada Nginx adalah pilihan fallback untuk aplikasi remote. TLS
+  wajib dan kredensial per aplikasi perlu dirotasi. Basic auth tidak
+  memberikan tenant isolation dan tidak mengikat identitas ke `service.name`.
 - Siapa pun yang memiliki akses ke network `monitoring` dapat mengirim
   telemetry tanpa auth. Batasi akses Docker ke operator tepercaya.
 - Collector tidak menyediakan rate limit bawaan untuk semua skenario. Lindungi
@@ -114,7 +114,8 @@ Yang perlu diperhatikan:
   redaksi di aplikasi sebelum mengirim log.
 - Grafana admin password awal disimpan di secret file. Rotasi setelah
   provisioning pertama bila diperlukan.
-- Sertifikat Caddy dan state TLS tersimpan di volume Caddy.
+- Kredensial OTLP disimpan di `nginx/secrets/otlp.htpasswd` pada VPS dan tidak
+  boleh masuk repository. Cloudflare Tunnel memegang TLS publik.
 - Gunakan digest image (`@sha256:...`) sebagai hardening setelah tag versi
   lolos pengujian, terutama untuk deployment produksi.
 

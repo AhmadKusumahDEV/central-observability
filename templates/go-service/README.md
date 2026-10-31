@@ -12,6 +12,7 @@ histogram HTTP standar, heartbeat, dan helper HTTP client.
 ## Menjalankan template
 
 ```powershell
+Copy-Item otel.env.example otel.env
 docker compose up -d --build
 ```
 
@@ -24,9 +25,18 @@ curl "http://127.0.0.1:8084/slow?delay_ms=900"
 Buka Grafana di `http://127.0.0.1:3000`, lalu pilih service
 `example-go-service` dan environment `dev`.
 
+File `otel.env` berisi konfigurasi lokal dan sudah diabaikan Git. Jangan
+commit credential asli ke `otel.env.example` atau ke repository.
+
 ## Mengganti nama service
 
-Ubah dua nilai di [`otel.env`](otel.env):
+Salin contoh env terlebih dahulu:
+
+```sh
+cp otel.env.example otel.env
+```
+
+Lalu ubah dua nilai di [`otel.env.example`](otel.env.example):
 
 ```dotenv
 OTEL_SERVICE_NAME=nama-service-baru

@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["telemetry", "telemetry-tower", "examples/axum"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+
+[workspace.dependencies]
+http = "=1.5.0"
+opentelemetry = "=0.33.1"
+opentelemetry_sdk = { version = "=0.33.1", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "=0.33.1", features = ["http-proto", "reqwest-rustls", "grpc-tonic"] }
+opentelemetry-appender-tracing = "=0.33.1"
+opentelemetry-http = "=0.33.1"
+tracing = "=0.1.43"
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json", "fmt"] }
+tower = "=0.5.3"
+axum = "=0.8.9"
+tokio = "=1.54.1"

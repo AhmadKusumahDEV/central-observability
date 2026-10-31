@@ -18,7 +18,10 @@ ikuti [docs/AGENT-INTEGRATION.md](docs/AGENT-INTEGRATION.md).
 | Loki | 3.6.16 | Logs |
 | Tempo | 3.1.1 | Traces |
 | Alertmanager | 0.34.1 | Routing notifikasi |
-| Caddy, profil opsional | 2.11.7 | TLS dan auth untuk endpoint remote |
+| Nginx di VPS, di luar stack | 1.25.5-alpine | Edge Cloudflare Tunnel untuk Grafana dan OTLP |
+
+Profil Caddy tetap tersedia untuk pengembangan lokal, tetapi jangan
+mengaktifkannya bersamaan dengan Nginx di VPS.
 
 Semua image memakai tag versi yang dikunci, bukan `latest`.
 
@@ -71,6 +74,12 @@ http://otel-collector:4318
 
 Aplikasi tidak memakai endpoint Prometheus, Loki, atau Tempo secara langsung.
 
+Untuk aplikasi remote, endpoint publik OTLP/HTTP adalah
+`https://otlp.madgo.my.id` dan Grafana tersedia di
+`https://observability.madgo.my.id`. Cloudflare Access untuk Grafana masih
+perlu diaktifkan dari dashboard. Detailnya ada di
+[docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md).
+
 ## Contoh aplikasi
 
 Tiga contoh lengkap tersedia:
@@ -93,13 +102,23 @@ Port host: Go `8081`, Node `8082`, Python `8083`. File Compose
 client hanya berisi aplikasi dan network; seluruh komponen monitoring berada
 di stack pusat.
 
-## Template Go untuk project baru
+## Template untuk project baru
 
-[templates/go-service](templates/go-service/) adalah project Go kecil yang
-sudah mengirim traces, histogram, logs, heartbeat, span HTTP keluar, dan span
-database. Yang perlu disalin ke project baru hanya folder
-[pkg/observability](templates/go-service/pkg/observability/observability.go).
-Jangan menyalin stack monitoring ke project aplikasi.
+Setiap bahasa punya satu template yang mengirim traces, histogram, logs, dan
+heartbeat ke Collector pusat. Salin foldernya ke project aplikasi; jangan
+menyalin stack monitoring.
+
+| Bahasa | Folder yang disalin | Panduan |
+|---|---|---|
+| Go | [pkg/observability](templates/go-service/pkg/observability/observability.go) | [templates/go-service](templates/go-service/README.md) |
+| Node.js | [src/observability](templates/node/src/observability) dan `src/adapters/` | [templates/node](templates/node/README.md) |
+| PHP | [src/](templates/php/src) dan `bin/heartbeat.php` | [templates/php](templates/php/README.md) |
+| Rust | [telemetry/](templates/rust/telemetry) dan `telemetry-tower/` | [templates/rust](templates/rust/README.md) |
+
+Setiap folder punya `README.md` yang menjelaskan file yang disalin dan
+`APP-AGENT-PROMPT.md` yang bisa diisi lalu diberikan ke agent di repo aplikasi.
+Kontrak yang berlaku lintas bahasa adalah OTLP dan resource attribute
+`service.name`, `deployment.environment.name`, dan `service.version`.
 
 ## Smoke test
 
@@ -135,6 +154,8 @@ Generator membuat `otel.env`, `docker-compose.yml`, dan
 - [Dokumentasi utama](docs/README.md)
 - [Panduan agent untuk project baru](docs/AGENT-INTEGRATION.md)
 - [Integrasi langkah demi langkah](docs/INTEGRATION.md)
+- [Akses online, Nginx, dan Cloudflare](docs/ONLINE-ACCESS.md)
+- [Security policy untuk repo publik](SECURITY.md)
 - [Aturan nama dan label](docs/NAMING.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Operasi, retensi, backup, dan alert](docs/OPERATIONS.md)
@@ -147,7 +168,7 @@ Generator membuat `otel.env`, `docker-compose.yml`, dan
 - Backend hanya berada di network internal.
 - Port administrasi dipetakan ke loopback host.
 - Jangan membuka Collector 4317/4318 atau backend langsung ke internet.
-- Untuk server remote, gunakan VPN atau profil Caddy dengan TLS dan
-  autentikasi.
+- Untuk server remote, gunakan Cloudflare Tunnel + Nginx dengan OTLP/HTTP dan
+  Basic auth per aplikasi seperti di [docs/ONLINE-ACCESS.md](docs/ONLINE-ACCESS.md).
 - Jangan commit isi folder `secrets/`.
 

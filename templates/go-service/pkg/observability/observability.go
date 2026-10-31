@@ -27,8 +27,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
@@ -59,6 +62,9 @@ type Config struct {
 	// Endpoint adalah alamat OTLP gRPC, misalnya
 	// http://otel-collector:4317 atau https://otel.example.com:443.
 	Endpoint string
+	// Protocol berisi grpc atau http/protobuf. Nilai kosong berarti grpc.
+	// Aplikasi remote memakai http/protobuf melalui Cloudflare Tunnel.
+	Protocol string
 	// Headers dipakai untuk auth remote, misalnya Authorization dari Caddy.
 	Headers map[string]string
 	// Insecure mematikan TLS. Biasanya tidak perlu karena skema http:// pada
@@ -69,7 +75,10 @@ type Config struct {
 	Compression string
 
 	// SampleRatio 1 menyimpan semua trace; 0.1 menyimpan sekitar 10 persen.
-	SampleRatio float64
+	// SampleRatioSet membedakan nilai 0 yang disengaja dari nilai zero-value
+	// Config yang belum diisi. ConfigFromEnv mengisi field ini.
+	SampleRatio    float64
+	SampleRatioSet bool
 
 	LogLevel string
 
@@ -104,9 +113,11 @@ func ConfigFromEnv() Config {
 		ServiceVersion:    firstNonEmpty(os.Getenv("OTEL_SERVICE_VERSION"), os.Getenv("SERVICE_VERSION"), resourceAttribute("service.version")),
 		Environment:       firstNonEmpty(os.Getenv("OTEL_DEPLOYMENT_ENVIRONMENT"), os.Getenv("DEPLOYMENT_ENVIRONMENT"), resourceAttribute("deployment.environment.name")),
 		Endpoint:          firstNonEmpty(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"), defaultEndpoint),
+		Protocol:          firstNonEmpty(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"), "grpc"),
 		Headers:           parseKVList(os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")),
 		Compression:       strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_COMPRESSION")),
 		SampleRatio:       1,
+		SampleRatioSet:    true,
 		LogLevel:          firstNonEmpty(os.Getenv("OBSERVABILITY_LOG_LEVEL"), os.Getenv("LOG_LEVEL"), "info"),
 		MetricInterval:    defaultMetricEvery,
 		HeartbeatInterval: defaultHeartbeat,
@@ -115,9 +126,19 @@ func ConfigFromEnv() Config {
 	if value := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_INSECURE")); value != "" {
 		cfg.Insecure = parseBool(value)
 	}
+	sampler := strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER")))
+	switch sampler {
+	case "always_off", "parentbased_always_off":
+		cfg.SampleRatio = 0
+		cfg.SampleRatioSet = true
+	case "always_on", "parentbased_always_on":
+		cfg.SampleRatio = 1
+		cfg.SampleRatioSet = true
+	}
 	if value := strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER_ARG")); value != "" {
 		if ratio, err := strconv.ParseFloat(value, 64); err == nil {
 			cfg.SampleRatio = ratio
+			cfg.SampleRatioSet = true
 		}
 	}
 	if value := strings.TrimSpace(os.Getenv("OTEL_METRIC_EXPORT_INTERVAL")); value != "" {
@@ -131,6 +152,11 @@ func ConfigFromEnv() Config {
 		}
 	}
 	if value := strings.TrimSpace(os.Getenv("OBSERVABILITY_ENABLED")); value != "" && !parseBool(value) {
+		cfg.DisableTraces = true
+		cfg.DisableMetrics = true
+		cfg.DisableLogs = true
+	}
+	if value := strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")); value != "" && parseBool(value) {
 		cfg.DisableTraces = true
 		cfg.DisableMetrics = true
 		cfg.DisableLogs = true
@@ -155,10 +181,22 @@ func Setup(ctx context.Context, cfg Config) (*Stack, error) {
 	if strings.TrimSpace(cfg.Endpoint) == "" {
 		cfg.Endpoint = defaultEndpoint
 	}
+	cfg.Protocol = strings.ToLower(strings.TrimSpace(cfg.Protocol))
+	switch cfg.Protocol {
+	case "", "grpc":
+		cfg.Protocol = "grpc"
+	case "http", "http/protobuf":
+		cfg.Protocol = "http"
+	default:
+		return nil, fmt.Errorf("protokol OTLP tidak didukung: %s (pakai grpc atau http/protobuf)", cfg.Protocol)
+	}
 	if strings.TrimSpace(cfg.LogLevel) == "" {
 		cfg.LogLevel = "info"
 	}
-	if cfg.SampleRatio <= 0 {
+	if cfg.SampleRatio < 0 {
+		cfg.SampleRatio = 0
+	}
+	if !cfg.SampleRatioSet && cfg.SampleRatio == 0 {
 		cfg.SampleRatio = 1
 	}
 	if cfg.MetricInterval <= 0 {
@@ -189,7 +227,16 @@ func Setup(ctx context.Context, cfg Config) (*Stack, error) {
 	)
 
 	if !cfg.DisableTraces {
-		exporter, err := otlptracegrpc.New(ctx, traceOptions(cfg)...)
+		var exporter sdktrace.SpanExporter
+		if cfg.Protocol == "http" {
+			opts, optionErr := traceHTTPOptions(cfg)
+			if optionErr != nil {
+				return nil, fmt.Errorf("membuat opsi trace HTTP: %w", optionErr)
+			}
+			exporter, err = otlptracehttp.New(ctx, opts...)
+		} else {
+			exporter, err = otlptracegrpc.New(ctx, traceOptions(cfg)...)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("membuat trace exporter: %w", err)
 		}
@@ -204,7 +251,16 @@ func Setup(ctx context.Context, cfg Config) (*Stack, error) {
 	}
 
 	if !cfg.DisableMetrics {
-		exporter, err := otlpmetricgrpc.New(ctx, metricOptions(cfg)...)
+		var exporter sdkmetric.Exporter
+		if cfg.Protocol == "http" {
+			opts, optionErr := metricHTTPOptions(cfg)
+			if optionErr != nil {
+				return nil, fmt.Errorf("membuat opsi metric HTTP: %w", optionErr)
+			}
+			exporter, err = otlpmetrichttp.New(ctx, opts...)
+		} else {
+			exporter, err = otlpmetricgrpc.New(ctx, metricOptions(cfg)...)
+		}
 		if err != nil {
 			shutdownProviders(ctx, nil, nil, traceProvider)
 			return nil, fmt.Errorf("membuat metric exporter: %w", err)
@@ -219,7 +275,16 @@ func Setup(ctx context.Context, cfg Config) (*Stack, error) {
 	}
 
 	if !cfg.DisableLogs {
-		exporter, err := otlploggrpc.New(ctx, logOptions(cfg)...)
+		var exporter sdklog.Exporter
+		if cfg.Protocol == "http" {
+			opts, optionErr := logHTTPOptions(cfg)
+			if optionErr != nil {
+				return nil, fmt.Errorf("membuat opsi log HTTP: %w", optionErr)
+			}
+			exporter, err = otlploghttp.New(ctx, opts...)
+		} else {
+			exporter, err = otlploggrpc.New(ctx, logOptions(cfg)...)
+		}
 		if err != nil {
 			shutdownProviders(ctx, nil, meterProvider, traceProvider)
 			return nil, fmt.Errorf("membuat log exporter: %w", err)
@@ -300,6 +365,25 @@ func traceOptions(cfg Config) []otlptracegrpc.Option {
 	return opts
 }
 
+func traceHTTPOptions(cfg Config) ([]otlptracehttp.Option, error) {
+	endpoint, insecure, err := signalEndpoint(cfg.Endpoint, "/v1/traces", cfg.Insecure)
+	if err != nil {
+		return nil, err
+	}
+	opts := []otlptracehttp.Option{otlptracehttp.WithEndpointURL(endpoint)}
+	if insecure {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlptracehttp.WithHeaders(cfg.Headers))
+	}
+	if strings.EqualFold(cfg.Compression, "gzip") {
+		opts = append(opts, otlptracehttp.WithCompression(otlptracehttp.GzipCompression))
+	}
+
+	return opts, nil
+}
+
 func metricOptions(cfg Config) []otlpmetricgrpc.Option {
 	opts := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpointURL(cfg.Endpoint)}
 	if cfg.Insecure {
@@ -313,6 +397,25 @@ func metricOptions(cfg Config) []otlpmetricgrpc.Option {
 	}
 
 	return opts
+}
+
+func metricHTTPOptions(cfg Config) ([]otlpmetrichttp.Option, error) {
+	endpoint, insecure, err := signalEndpoint(cfg.Endpoint, "/v1/metrics", cfg.Insecure)
+	if err != nil {
+		return nil, err
+	}
+	opts := []otlpmetrichttp.Option{otlpmetrichttp.WithEndpointURL(endpoint)}
+	if insecure {
+		opts = append(opts, otlpmetrichttp.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlpmetrichttp.WithHeaders(cfg.Headers))
+	}
+	if strings.EqualFold(cfg.Compression, "gzip") {
+		opts = append(opts, otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression))
+	}
+
+	return opts, nil
 }
 
 func logOptions(cfg Config) []otlploggrpc.Option {
@@ -330,16 +433,55 @@ func logOptions(cfg Config) []otlploggrpc.Option {
 	return opts
 }
 
+func logHTTPOptions(cfg Config) ([]otlploghttp.Option, error) {
+	endpoint, insecure, err := signalEndpoint(cfg.Endpoint, "/v1/logs", cfg.Insecure)
+	if err != nil {
+		return nil, err
+	}
+	opts := []otlploghttp.Option{otlploghttp.WithEndpointURL(endpoint)}
+	if insecure {
+		opts = append(opts, otlploghttp.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlploghttp.WithHeaders(cfg.Headers))
+	}
+	if strings.EqualFold(cfg.Compression, "gzip") {
+		opts = append(opts, otlploghttp.WithCompression(otlploghttp.GzipCompression))
+	}
+
+	return opts, nil
+}
+
+func signalEndpoint(base, suffix string, forceInsecure bool) (string, bool, error) {
+	parsed, err := url.Parse(strings.TrimSpace(base))
+	if err != nil {
+		return "", false, fmt.Errorf("endpoint OTLP tidak valid: %w", err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", false, fmt.Errorf("endpoint OTLP harus memuat skema dan host: %s", base)
+	}
+
+	trimmedPath := strings.TrimRight(parsed.Path, "/")
+	if !strings.HasSuffix(trimmedPath, suffix) {
+		trimmedPath += suffix
+	}
+	parsed.Path = trimmedPath
+
+	insecure := forceInsecure || strings.EqualFold(parsed.Scheme, "http")
+
+	return parsed.String(), insecure, nil
+}
+
 func shutdownProviders(ctx context.Context, logs *sdklog.LoggerProvider, metrics *sdkmetric.MeterProvider, traces *sdktrace.TracerProvider) error {
 	var errs []error
-	if logs != nil {
-		errs = append(errs, logs.Shutdown(ctx))
+	if traces != nil {
+		errs = append(errs, traces.Shutdown(ctx))
 	}
 	if metrics != nil {
 		errs = append(errs, metrics.Shutdown(ctx))
 	}
-	if traces != nil {
-		errs = append(errs, traces.Shutdown(ctx))
+	if logs != nil {
+		errs = append(errs, logs.Shutdown(ctx))
 	}
 
 	return errors.Join(errs...)
@@ -509,11 +651,16 @@ func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 }
 
 func routeFromRequest(r *http.Request) string {
-	if r.Pattern != "" {
-		return r.Pattern
+	if r.Pattern == "" {
+		return ""
+	}
+	// ServeMux dengan pola method menghasilkan "GET /work". Label route harus
+	// berupa template path tanpa method.
+	if _, pattern, ok := strings.Cut(r.Pattern, " "); ok {
+		return pattern
 	}
 
-	return "unmatched"
+	return r.Pattern
 }
 
 func routeOrUnmatched(route string) string {

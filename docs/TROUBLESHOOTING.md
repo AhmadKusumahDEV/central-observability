@@ -44,7 +44,9 @@ count by (__name__) ({__name__=~"http_server_request_duration.*", service_name="
 
 Jika kosong:
 
-1. Pastikan `OTEL_METRICS_EXPORTER=otlp`.
+1. Untuk package Go ini, pastikan `OBSERVABILITY_ENABLED` bukan `false`.
+   Variabel `OTEL_METRICS_EXPORTER` hanya berlaku untuk SDK lain; package
+   selalu memakai OTLP.
 2. Pastikan histogram direkam dengan nama
    `http.server.request.duration` dan unit `s`.
 3. Tunggu satu interval export SDK, biasanya 10 detik.
@@ -87,6 +89,9 @@ Pastikan exporter logs aktif:
 ```dotenv
 OTEL_LOGS_EXPORTER=otlp
 ```
+
+Untuk package Go di repo ini, variabel tersebut tidak dibaca; package selalu
+mengirim logs lewat OTLP. Variabel ini relevan untuk SDK bahasa lain.
 
 Log yang hanya dicetak ke stdout container tidak otomatis dibaca Collector
 pusat. Gunakan OTel Logs SDK atau log bridge yang mengirim OTLP.
@@ -149,18 +154,32 @@ Datasource Prometheus sudah memiliki tujuan exemplar ke Tempo.
 
 Periksa:
 
-- DNS domain mengarah ke server;
-- port 443 terbuka;
-- sertifikat TLS valid;
-- header Basic auth dikirim;
-- karakter `+`, `/`, dan `=` dari base64 sudah
-  diubah menjadi `%2B`, `%2F`, dan `%3D`.
+- Public Hostname `otlp.madgo.my.id` sudah ada di Cloudflare Tunnel;
+- endpoint memakai `https://otlp.madgo.my.id`, bukan port 4317/4318;
+- protocol SDK `http/protobuf`;
+- header Basic auth per aplikasi dikirim;
+- karakter `+`, `/`, dan `=` dari base64 sudah diubah menjadi `%2B`, `%2F`,
+  dan `%3D`;
+- jika Cloudflare Access aktif, service token dikirim sebagai header.
 
-Lihat log Caddy:
+Lihat log Nginx:
 
 ```sh
-docker compose --profile ingress logs --tail=200 caddy
+docker logs --tail=200 nginx-proxy
 ```
+
+Arti status yang umum:
+
+- `401`: Basic auth salah atau user belum ada di `otlp.htpasswd`.
+- `403`: Cloudflare Access menolak service token, atau gRPC diaktifkan pada
+  hostname yang dilindungi Access.
+- `404`: path bukan `/v1/traces`, `/v1/metrics`, atau `/v1/logs`.
+- `413`: payload melewati 8 MiB di Nginx atau batas Collector. Perkecil batch.
+- `429`: rate limit Nginx. Kurangi laju atau tambah kapasitas.
+- `502`: Nginx tidak dapat menjangkau Collector; periksa network
+  `observability-ingress` dan container Collector.
+- `504` atau `524`: timeout. OTLP normalnya pendek; periksa Collector dan
+  Cloudflare 125 detik.
 
 Jangan membuka port Collector langsung ke internet.
 

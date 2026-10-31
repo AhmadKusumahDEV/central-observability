@@ -1,6 +1,9 @@
 .git
 .env
 otel.env
+otel.*.env
+secrets/
+*.htpasswd
 README.md
 **/*_test.go
 app

@@ -10,13 +10,15 @@ dan exemplar.
 ```mermaid
 flowchart LR
     APP[Aplikasi di network monitoring] -->|OTLP| COL[OTel Collector]
-    REMOTE[Aplikasi remote] -->|HTTPS + auth| CADDY[Caddy ingress]
-    CADDY --> COL
+    REMOTE[Aplikasi remote] -->|HTTPS + auth| CF[Cloudflare Tunnel]
+    CF --> NGINX[Nginx VPS]
+    NGINX -->|OTLP/HTTP| COL
+    NGINX -->|HTTPS| GRAF[Grafana]
     COL --> TEMPO[Tempo traces]
     COL --> LOKI[Loki logs]
     COL --> PROM[Prometheus metrics]
     PROM --> AM[Alertmanager]
-    GRAF[Grafana] --> PROM
+    GRAF --> PROM
     GRAF --> LOKI
     GRAF --> TEMPO
 ```
@@ -37,9 +39,12 @@ terbuka untuk aplikasi.
 | Loki | Tidak untuk aplikasi | `http://127.0.0.1:3100` |
 | Tempo | Tidak untuk aplikasi | `http://127.0.0.1:3200` |
 | Alertmanager | Tidak untuk aplikasi | `http://127.0.0.1:9093` |
+| Grafana remote | Tidak untuk aplikasi | `https://observability.madgo.my.id` |
+| OTLP/HTTP remote | `https://otlp.madgo.my.id` | `https://otlp.madgo.my.id` |
 
-Untuk server remote, gunakan Tailscale/WireGuard atau aktifkan profil Caddy
-sesuai [INTEGRATION.md](INTEGRATION.md).
+Untuk server remote, gunakan Cloudflare Tunnel + Nginx sesuai
+[ONLINE-ACCESS.md](ONLINE-ACCESS.md). Tailscale/WireGuard tetap pilihan yang
+lebih kuat untuk akses admin dan gRPC privat.
 
 ## Mulai dari mana
 
@@ -71,6 +76,8 @@ Dokumen lengkap:
 6. [ROADMAP.md](ROADMAP.md): batasan dan rencana berikutnya.
 7. [adr/README.md](adr/README.md): alasan keputusan arsitektur.
 8. [AGENTS.md](../AGENTS.md): kontrak kerja untuk coding agent.
+9. [ONLINE-ACCESS.md](ONLINE-ACCESS.md): akses publik, Nginx, Cloudflare
+   Tunnel, dan keamanan endpoint remote.
 
 Hasil uji template dan smoke test terakhir ada di
 [VERIFICATION.md](VERIFICATION.md).
@@ -102,9 +109,16 @@ Folder [examples](../examples/) berisi aplikasi Go, Node.js, dan Python yang
 masing-masing menghasilkan traces, histogram, logs, heartbeat, HTTP client
 span, dan SQLite database span.
 
-Folder [templates/go-service](../templates/go-service/) berisi template Go yang
-dapat disalin ke project baru. Package observability-nya sudah memakai OTLP
-untuk ketiga sinyal dan tidak menjalankan stack monitoring sendiri.
+Folder `templates/` berisi template per bahasa yang dapat disalin ke project
+baru. Setiap template memakai OTLP untuk ketiga sinyal dan tidak menjalankan
+stack monitoring sendiri.
+
+| Bahasa | Template | Prompt untuk agent |
+|---|---|---|
+| Go | [templates/go-service](../templates/go-service/README.md) | [templates/APP-AGENT-PROMPT.md](../templates/APP-AGENT-PROMPT.md) |
+| Node.js | [templates/node](../templates/node/README.md) | [templates/node/APP-AGENT-PROMPT.md](../templates/node/APP-AGENT-PROMPT.md) |
+| PHP | [templates/php](../templates/php/README.md) | [templates/php/APP-AGENT-PROMPT.md](../templates/php/APP-AGENT-PROMPT.md) |
+| Rust | [templates/rust](../templates/rust/README.md) | [templates/rust/APP-AGENT-PROMPT.md](../templates/rust/APP-AGENT-PROMPT.md) |
 
 ```sh
 docker compose -f examples/docker-compose.client.yml --profile go up -d --build

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -56,7 +57,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              env("APP_ADDR", ":8080"),
-		Handler:           app.stack.HandlerWithRoute(mux, routeForRequest),
+		Handler:           app.stack.HandlerWithRoute(mux, routeForRequest(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -69,14 +70,17 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		app.logger.ErrorContext(shutdownCtx, "server shutdown", "error", err)
+	serverCtx, cancelServer := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := server.Shutdown(serverCtx); err != nil {
+		app.logger.ErrorContext(serverCtx, "server shutdown", "error", err)
 	}
-	if err := app.stack.Shutdown(shutdownCtx); err != nil {
-		app.logger.ErrorContext(shutdownCtx, "telemetry shutdown", "error", err)
+	cancelServer()
+
+	telemetryCtx, cancelTelemetry := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := app.stack.Shutdown(telemetryCtx); err != nil {
+		app.logger.ErrorContext(telemetryCtx, "telemetry shutdown", "error", err)
 	}
+	cancelTelemetry()
 }
 
 func newApplication(ctx context.Context) (*application, error) {
@@ -203,11 +207,12 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-func routeForRequest(r *http.Request) string {
-	switch r.URL.Path {
-	case "/healthz", "/downstream", "/work", "/error", "/slow":
-		return r.URL.Path
-	default:
-		return "unmatched"
+func routeForRequest(mux *http.ServeMux) func(*http.Request) string {
+	return func(r *http.Request) string {
+		_, pattern := mux.Handler(r)
+		if _, path, ok := strings.Cut(pattern, " "); ok {
+			return path
+		}
+		return pattern
 	}
 }
